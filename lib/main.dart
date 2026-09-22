@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mova/find_driver_screen.dart';
 
-import 'splash_screen.dart';
-import 'login_screen.dart';
-import 'home_screen.dart';
 import 'message_screen.dart';
 
 void main() {
