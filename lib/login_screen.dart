@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
+import 'models/login_request.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,13 +27,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _login() {
     if (_formKey.currentState!.validate()) {
-      final studentNumber = studentNumberController.text;
-      final password = passwordController.text;
+      final request = LoginRequest(
+        studentNumber: studentNumberController.text, 
+        password: passwordController.text
+        );
+
+      print(request.studentNumber);
+      print(request.password);
+
 
 
       
-      print('Student number: $studentNumber');
-      print('Password: $password');
+  
     }
   }
 

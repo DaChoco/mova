@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'models/register_request.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -11,6 +12,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  
   final studentNameController = TextEditingController();
   final studentSurnameController = TextEditingController();
   final studentNumberController = TextEditingController();
@@ -32,16 +34,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _register() {
     if (_formKey.currentState!.validate()) {
-      final studentName = studentNameController.text;
-      final studentSurname = studentSurnameController.text;
-      final studentNumber = studentNumberController.text;
-      final password = passwordController.text;
+      final request = RegisterRequest(
+        studentName: studentNameController.text, 
+        studentSurname: studentSurnameController.text, 
+        studentNumber: studentNumberController.text, 
+        password: passwordController.text
+        );
 
       // TESTING
-      print('Student Name: $studentName');
-      print('Student Surname: $studentSurname');
-      print('Student number: $studentNumber');
-      print('Password: $password');
+      print(request.studentName);
+      print(request.studentSurname);
+      print(request.studentNumber);
+      print(request.password);
     }
   }
 
