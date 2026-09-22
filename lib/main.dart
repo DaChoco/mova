@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mova/find_driver_screen.dart';
 
+import 'profile_screen.dart';
 import 'splash_screen.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
@@ -35,7 +36,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const splashScreen(),
+      home: const ProfileScreen(),
     );
   }
 }
