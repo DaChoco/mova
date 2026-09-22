@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
+// just put all the imports here so its easy to switch
 import 'message_screen.dart';
+import 'splash_screen.dart';
+import 'profile_screen.dart';
+import 'register_screen.dart';
+import 'login_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -32,7 +37,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MessageScreen(),
+      home: const LoginScreen(),
     );
   }
 }

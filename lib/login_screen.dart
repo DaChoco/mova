@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       final studentNumber = studentNumberController.text;
       final password = passwordController.text;
+
 
       
       print('Student number: $studentNumber');
@@ -71,13 +73,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your student number';
                     }
+                    else if (!value.contains("EDUV") || value.length != 11 ){
+                      // Eduvos Student Numbers are eleven digits and always contain eduv
+                      return "ERROR: Please enter a valid student number. Eg EDUVxxxxxxx";
+                    }
                     return null;
                   },
                 ),
 
                 const SizedBox(height: 20),
 
-                // Password
+                // Password HERE
                 TextFormField(
                   controller: passwordController,
                   obscureText: _hidePassword,
@@ -109,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 30),
 
-                // Login button
+                // Login button HERE
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
@@ -118,6 +124,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Login',
                       style: TextStyle(fontSize: 18),
                     ),
+                  ),
+                ),
+
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RegisterScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Already have an account? Register',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
               ],
