@@ -19,11 +19,13 @@ user:{
     }
 }
 
-/api/user/register - POST
-
-/api/user/login - POST
-
 /api/user/update/1 - POST
+
+# AUTH
+
+/api/auth/register - POST
+
+/api/auth/login - POST
 
 # RIDE ROUTES
 
