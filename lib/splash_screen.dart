@@ -21,10 +21,10 @@ class _SplashScreenState extends State<SplashScreen>
     // The animation length
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 1500),
     );
 
-    // Making it bounce up and down
+    // Making it bounce up and downR
     _animation = Tween<double>(
       begin: 0,
       end: -20,

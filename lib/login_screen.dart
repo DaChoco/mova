@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+
 import 'register_screen.dart';
 import 'models/auth.dart';
 
@@ -28,17 +28,12 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() {
     if (_formKey.currentState!.validate()) {
       final request = LoginRequest(
-        studentNumber: studentNumberController.text, 
-        password: passwordController.text
-        );
+        studentNumber: studentNumberController.text,
+        password: passwordController.text,
+      );
 
       print(request.studentNumber);
       print(request.password);
-
-
-
-      
-  
     }
   }
 
@@ -57,10 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'Student Login',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 40),
@@ -68,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Student number
                 TextFormField(
                   controller: studentNumberController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.name,
                   decoration: const InputDecoration(
                     labelText: 'Student Number',
                     hintText: 'Enter your student number',
@@ -78,8 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your student number';
-                    }
-                    else if (!value.contains("EDUV") || value.length != 11 ){
+                    } else if (!value.contains("EDUV") || value.length != 11) {
                       // Eduvos Student Numbers are eleven digits and always contain eduv
                       return "ERROR: Please enter a valid student number. Eg EDUVxxxxxxx";
                     }
@@ -100,9 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _hidePassword
-                            ? Icons.visibility
-                            : Icons.visibility_off,
+                        _hidePassword ? Icons.visibility : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -126,10 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 50,
                   child: ElevatedButton(
                     onPressed: _login,
-                    child: const Text(
-                      'Login',
-                      style: TextStyle(fontSize: 18),
-                    ),
+                    child: const Text('Login', style: TextStyle(fontSize: 18)),
                   ),
                 ),
 
@@ -155,4 +141,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
