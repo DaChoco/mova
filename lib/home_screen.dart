@@ -1,28 +1,19 @@
 import 'package:flutter/material.dart';
 
 import 'profile_screen.dart';
+import 'main.dart';
 
 class HomeScreen extends StatelessWidget {
-  final bool isDarkMode;
-  final ValueChanged<bool> onDarkModeChanged;
-
-  const HomeScreen({
-    super.key,
-    this.isDarkMode = false,
-    this.onDarkModeChanged = _defaultDarkModeChanged,
-  });
-
-  static void _defaultDarkModeChanged(bool value) {}
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Hamburger menu / Drawer
       drawer: Drawer(
         child: SafeArea(
           child: Column(
             children: [
-              // User Profile Section
+              // Profile section
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -45,7 +36,7 @@ class HomeScreen extends StatelessWidget {
 
                     const SizedBox(height: 4),
 
-                    Text(
+                    const Text(
                       'EDUV1234567',
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
@@ -79,12 +70,22 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              // Dark Mode Toggle
-              SwitchListTile(
-                secondary: const Icon(Icons.dark_mode),
-                title: const Text('Dark Mode', style: TextStyle(fontSize: 16)),
-                value: isDarkMode,
-                onChanged: onDarkModeChanged,
+              // Dark Mode
+              ValueListenableBuilder<bool>(
+                valueListenable: themeModeNotifier,
+                builder: (context, isDarkMode, child) {
+                  return SwitchListTile(
+                    secondary: const Icon(Icons.dark_mode),
+                    title: const Text(
+                      'Dark Mode',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    value: isDarkMode,
+                    onChanged: (value) {
+                      themeModeNotifier.value = value;
+                    },
+                  );
+                },
               ),
 
               // Logout
@@ -98,7 +99,6 @@ class HomeScreen extends StatelessWidget {
 
               const Spacer(),
 
-              // App Name
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
@@ -120,13 +120,12 @@ class HomeScreen extends StatelessWidget {
         centerTitle: true,
       ),
 
-      // Main Body
+      // Home Body
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Message
             const Text(
               'Welcome!',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -141,7 +140,7 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            // Find Driver Button
+            // Find a Driver
             SizedBox(
               width: double.infinity,
               height: 65,
@@ -159,7 +158,7 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 15),
 
-            // Find Passenger Button
+            // Find a Passenger
             SizedBox(
               width: double.infinity,
               height: 65,
@@ -177,7 +176,6 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // Recent Messages Heading
             const Text(
               'Recent Messages',
               style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
@@ -185,11 +183,11 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // Message History
+            // Recent Messages
             Expanded(
               child: ListView(
                 children: [
-                  // John Doe
+                  // Message 1
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
@@ -221,7 +219,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Jane Smith
+                  // Message 2
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
@@ -251,7 +249,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Another John Doe
+                  // Message 3
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(

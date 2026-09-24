@@ -72,7 +72,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your student number';
                     } else if (!value.contains("EDUV") || value.length != 11) {
-                      // Eduvos Student Numbers are eleven digits and always contain eduv
                       return "ERROR: Please enter a valid student number. Eg EDUVxxxxxxx";
                     }
                     return null;
@@ -81,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // Password HERE
+                // Password
                 TextFormField(
                   controller: passwordController,
                   obscureText: _hidePassword,
@@ -111,19 +110,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 30),
 
-                // Login button HERE
+                // Login button
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      //TEMPORARY LOGIN
+                      // TEMPORARY LOGIN
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => HomeScreen(
-                            isDarkMode: false,
-                            onDarkModeChanged: (value) {},
-                          ),
+                          builder: (context) => const HomeScreen(),
                         ),
                       );
                     },
@@ -131,10 +127,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                //     onPressed: _login,
-                //     child: const Text('Login', style: TextStyle(fontSize: 18)),
-                //   ),
-                // ),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
