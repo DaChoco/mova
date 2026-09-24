@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'register_screen.dart';
 import 'models/auth.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -114,11 +115,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _login,
-                    child: const Text('Login', style: TextStyle(fontSize: 18)),
+                    onPressed: () {
+                      //TEMPORARY LOGIN
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => HomeScreen(
+                            isDarkMode: false,
+                            onDarkModeChanged: (value) {},
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Login'),
                   ),
                 ),
 
+                //     onPressed: _login,
+                //     child: const Text('Login', style: TextStyle(fontSize: 18)),
+                //   ),
+                // ),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
