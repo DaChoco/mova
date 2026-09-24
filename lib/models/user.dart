@@ -51,6 +51,26 @@ class SavedLocation {
     required this.latitude,
     required this.longitude,
   });
+
+  factory SavedLocation.fromJson(Map<String, dynamic> json) {
+    return SavedLocation(
+      locationId: json['locationId'].toString(),
+      name: json['name'],
+      address: json['address'],
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'locationId': locationId,
+      'name': name,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
 }
 
 class UserRating {
@@ -61,6 +81,14 @@ class UserRating {
     required this.averageRating,
     required this.numberOfRatings,
   });
+
+  factory UserRating.fromJson(Map<String, dynamic> json){
+    return (UserRating(
+      averageRating: json["averageRating"], 
+      numberOfRatings: json["numberofRatings"]
+      ));
+
+  }
 }
 
 class EmergencyContact {

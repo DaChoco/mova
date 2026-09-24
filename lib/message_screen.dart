@@ -155,7 +155,7 @@ class _MessageScreenState extends State<MessageScreen> {
               decoration: BoxDecoration(
                 color: theme.scaffoldBackgroundColor,
                 border: Border(
-                  top: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                  top: BorderSide(color: colorScheme.outline.withValues(alpha: 0.3)),
                 ),
               ),
               child: Row(

@@ -197,7 +197,7 @@ class HomeScreen extends StatelessWidget {
                           .surfaceContainerHighest,
                       border: Border.all(
                         color: Theme.of(context).colorScheme.outline
-                            .withOpacity(0.3),
+                            .withValues(alpha: 0.3),
                       ),
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -234,7 +234,7 @@ class HomeScreen extends StatelessWidget {
                           .surfaceContainerHighest,
                       border: Border.all(
                         color: Theme.of(context).colorScheme.outline
-                            .withOpacity(0.3),
+                            .withValues(alpha: 0.3),
                       ),
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -264,7 +264,7 @@ class HomeScreen extends StatelessWidget {
                           .surfaceContainerHighest,
                       border: Border.all(
                         color: Theme.of(context).colorScheme.outline
-                            .withOpacity(0.3),
+                            .withValues(alpha: 0.3),
                       ),
                       borderRadius: BorderRadius.circular(15),
                     ),
