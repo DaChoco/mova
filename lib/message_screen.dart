@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'home_screen.dart';
-
 class MessageScreen extends StatefulWidget {
   const MessageScreen({super.key});
 
@@ -20,15 +18,15 @@ class _MessageScreenState extends State<MessageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            );
+            Navigator.pop(context);
           },
         ),
 
@@ -73,16 +71,19 @@ class _MessageScreenState extends State<MessageScreen> {
                     ),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(18),
                         topRight: Radius.circular(18),
                         bottomRight: Radius.circular(18),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Hey, are you still coming?',
-                      style: TextStyle(fontSize: 15),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                   ),
                 ),
@@ -98,16 +99,19 @@ class _MessageScreenState extends State<MessageScreen> {
                     ),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(18),
                         topRight: Radius.circular(18),
                         bottomLeft: Radius.circular(18),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Yeah, I am on my way!',
-                      style: TextStyle(color: Colors.white, fontSize: 15),
+                      style: TextStyle(
+                        color: colorScheme.onPrimary,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 ),
@@ -123,16 +127,19 @@ class _MessageScreenState extends State<MessageScreen> {
                     ),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(18),
                         topRight: Radius.circular(18),
                         bottomRight: Radius.circular(18),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Great! See you soon.',
-                      style: TextStyle(fontSize: 15),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                   ),
                 ),
@@ -146,8 +153,10 @@ class _MessageScreenState extends State<MessageScreen> {
             child: Container(
               padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                border: Border(top: BorderSide(color: Colors.grey.shade300)),
+                color: theme.scaffoldBackgroundColor,
+                border: Border(
+                  top: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -161,7 +170,7 @@ class _MessageScreenState extends State<MessageScreen> {
                       decoration: InputDecoration(
                         hintText: 'Type a message...',
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: colorScheme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 18,
                           vertical: 12,
@@ -186,11 +195,11 @@ class _MessageScreenState extends State<MessageScreen> {
 
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
+                      icon: Icon(Icons.send, color: colorScheme.onPrimary),
                       onPressed: () {
                         // Sending functionality will be added later
                       },
