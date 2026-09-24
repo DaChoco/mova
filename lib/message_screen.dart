@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'home_screen.dart';
+
 class MessageScreen extends StatefulWidget {
   const MessageScreen({super.key});
 
@@ -11,23 +13,44 @@ class _MessageScreenState extends State<MessageScreen> {
   final TextEditingController messageController = TextEditingController();
 
   @override
+  void dispose() {
+    messageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
           },
         ),
 
-        title: Row(
+        titleSpacing: 0,
+
+        title: const Row(
           children: [
-            const CircleAvatar(radius: 20, child: Icon(Icons.person)),
+            CircleAvatar(radius: 20, child: Icon(Icons.person)),
 
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
 
-            const Text('John Doe'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'John Doe',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+
+                Text('Online', style: TextStyle(fontSize: 12)),
+              ],
+            ),
           ],
         ),
       ),
@@ -37,19 +60,30 @@ class _MessageScreenState extends State<MessageScreen> {
           // Messages
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
               children: [
                 // Received message
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 10),
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
                     ),
-                    child: const Text('Hey, are you still coming?'),
+                    child: const Text(
+                      'Hey, are you still coming?',
+                      style: TextStyle(fontSize: 15),
+                    ),
                   ),
                 ),
 
@@ -57,15 +91,23 @@ class _MessageScreenState extends State<MessageScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 10),
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(15),
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomLeft: Radius.circular(18),
+                      ),
                     ),
                     child: const Text(
                       'Yeah, I am on my way!',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Colors.white, fontSize: 15),
                     ),
                   ),
                 ),
@@ -74,13 +116,24 @@ class _MessageScreenState extends State<MessageScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 10),
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
                     ),
-                    child: const Text('Great! See you soon.'),
+                    child: const Text(
+                      'Great! See you soon.',
+                      style: TextStyle(fontSize: 15),
+                    ),
                   ),
                 ),
               ],
@@ -88,30 +141,63 @@ class _MessageScreenState extends State<MessageScreen> {
           ),
 
           // Message input
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Type a message...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
+          SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                border: Border(top: BorderSide(color: Colors.grey.shade300)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: messageController,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: () {
-                    // Sending functionality will be added later
-                  },
-                ),
-              ],
+                  const SizedBox(width: 6),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white),
+                      onPressed: () {
+                        // Sending functionality will be added later
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
