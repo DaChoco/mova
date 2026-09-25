@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'profile_screen.dart';
 import 'main.dart';
 import 'message_screen.dart';
+import 'find_driver_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -147,7 +148,12 @@ class HomeScreen extends StatelessWidget {
               height: 65,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  print('Find Driver pressed');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FindDriverScreen(),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.directions_car),
                 label: const Text(
