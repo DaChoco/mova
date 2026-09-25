@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+
+class MessageScreen extends StatefulWidget {
+  const MessageScreen({super.key});
+
+  @override
+  State<MessageScreen> createState() => _MessageScreenState();
+}
+
+class _MessageScreenState extends State<MessageScreen> {
+  final TextEditingController messageController = TextEditingController();
+
+  @override
+  void dispose() {
+    messageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+
+        titleSpacing: 0,
+
+        title: const Row(
+          children: [
+            CircleAvatar(radius: 20, child: Icon(Icons.person)),
+
+            SizedBox(width: 10),
+
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'John Doe',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+
+                Text('Online', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ],
+        ),
+      ),
+
+      body: Column(
+        children: [
+          // Messages
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+              children: [
+                // Received message
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
+                    ),
+                    child: Text(
+                      'Hey, are you still coming?',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Sent message
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomLeft: Radius.circular(18),
+                      ),
+                    ),
+                    child: Text(
+                      'Yeah, I am on my way!',
+                      style: TextStyle(
+                        color: colorScheme.onPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Received message
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
+                    ),
+                    child: Text(
+                      'Great! See you soon.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Message input
+          SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                border: Border(
+                  top: BorderSide(color: colorScheme.outline.withValues(alpha: 0.3)),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: messageController,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 6),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.send, color: colorScheme.onPrimary),
+                      onPressed: () {
+                        // Sending functionality will be added later
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -3,22 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// "Profile Screen" — lets the user pick/replace a profile picture and
-/// edit their Name, Surname, Student Email and Password.
-///
-/// NOTE: this is UI-only for now — Save/Log Out just show a TODO via
-/// SnackBar. Nothing is persisted or sent anywhere until a backend
-/// endpoint (or local storage) is wired into `_handleSave` /
-/// `_handleLogOut`.
-///
-/// Setup required for the image picker to work:
-///   1. Run: flutter pub add image_picker
-///   2. iOS: add NSPhotoLibraryUsageDescription (and
-///      NSCameraUsageDescription if you also want camera capture) to
-///      ios/Runner/Info.plist.
-///   3. Android: no manifest entry needed for gallery-only picking on
-///      modern Android versions; image_picker's own setup docs cover
-///      edge cases for older SDKs.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -35,6 +19,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
 
+  bool _hidePassword = true;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -49,22 +35,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       source: ImageSource.gallery,
       imageQuality: 85,
     );
+
     if (picked != null) {
-      setState(() => _profileImage = File(picked.path));
+      setState(() {
+        _profileImage = File(picked.path);
+      });
     }
   }
 
   void _handleSave() {
-    // TODO: send the updated fields (and image) to your backend.
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Save tapped — backend not wired yet')),
+      const SnackBar(content: Text('Profile saved — backend not wired yet')),
     );
   }
 
   void _handleLogOut() {
-    // TODO: clear session/auth state and navigate to the login screen.
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Log Out tapped — backend not wired yet')),
+      const SnackBar(content: Text('Log Out pressed — backend not wired yet')),
     );
   }
 
@@ -72,44 +59,108 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Screen'),
+        title: const Text(
+          'Profile',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
       ),
-      backgroundColor: Colors.white,
+
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Profile picture
               Center(child: _buildAvatarPicker()),
-              const SizedBox(height: 32),
-              _buildLabeledField(label: 'Name', controller: _nameController),
+
+              const SizedBox(height: 12),
+
+              const Center(
+                child: Text(
+                  'Tap your picture to change it',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              // Name
+              _buildLabeledField(
+                label: 'Name',
+                controller: _nameController,
+                icon: Icons.person_outline,
+              ),
+
               const SizedBox(height: 20),
+
+              // Surname
               _buildLabeledField(
                 label: 'Surname',
                 controller: _surnameController,
+                icon: Icons.person_outline,
               ),
+
               const SizedBox(height: 20),
+
+              // Email
               _buildLabeledField(
                 label: 'Student Email',
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                icon: Icons.email_outlined,
               ),
+
               const SizedBox(height: 20),
+
+              // Password
               _buildLabeledField(
                 label: 'Password',
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _hidePassword,
+                icon: Icons.lock_outline,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _hidePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _hidePassword = !_hidePassword;
+                    });
+                  },
+                ),
               ),
-              const SizedBox(height: 32),
-              _buildPillButton(label: 'Save', onPressed: _handleSave),
-              const SizedBox(height: 16),
-              _buildPillButton(label: 'Log Out', onPressed: _handleLogOut),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 30),
+
+              // Save button
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _handleSave,
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              // Log out button
+              SizedBox(
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: _handleLogOut,
+                  child: const Text(
+                    'Log Out',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -124,27 +175,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           CircleAvatar(
             radius: 55,
-            backgroundColor: const Color(0xFFF2F2F2),
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
             backgroundImage: _profileImage != null
                 ? FileImage(_profileImage!)
                 : null,
             child: _profileImage == null
-                ? const Icon(Icons.person, size: 55, color: Colors.black45)
+                ? Icon(
+                    Icons.person,
+                    size: 55,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )
                 : null,
           ),
+
           Positioned(
             bottom: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
-                color: Colors.black87,
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.camera_alt,
-                size: 16,
-                color: Colors.white,
+                size: 17,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
           ),
@@ -156,58 +214,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildLabeledField({
     required String label,
     required TextEditingController controller,
+    required IconData icon,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 6),
+
+        const SizedBox(height: 8),
+
         TextField(
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
           decoration: InputDecoration(
-            suffixIcon: const Icon(Icons.edit, size: 18, color: Colors.black45),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 12,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.black87),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
+            prefixIcon: Icon(icon),
+            suffixIcon: suffixIcon,
+            hintText: 'Enter your $label',
+            border: const OutlineInputBorder(),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPillButton({
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 16)),
     );
   }
 }

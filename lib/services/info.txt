@@ -1,0 +1,6 @@
+We should store all the files related to sending requests to the backend here
+/auth_service.dart
+/user_service.dart
+/location_service.dart
+
+these are to SEND. C# handles the backend

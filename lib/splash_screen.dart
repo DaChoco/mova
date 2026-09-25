@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen>
     // The animation length
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 2000),
     );
 
     // Making it bounce up and down
@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        MaterialPageRoute(builder: (context) => LoginScreen()),
       );
     });
   }
@@ -66,7 +66,9 @@ class _SplashScreenState extends State<SplashScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset('assets/mova-icon.png', width: 150),
+
               const SizedBox(height: 16),
+
               const Text(
                 'Mova',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
