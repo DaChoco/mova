@@ -4,6 +4,7 @@ import 'profile_screen.dart';
 import 'main.dart';
 import 'message_screen.dart';
 import 'find_driver_screen.dart';
+import 'find_passenger.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -171,7 +172,12 @@ class HomeScreen extends StatelessWidget {
               height: 65,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  print('Find Passenger pressed');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FindPassengerScreen(),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.person_search),
                 label: const Text(
