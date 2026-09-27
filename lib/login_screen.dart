@@ -71,9 +71,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your student number';
-                    } else if (!value.contains("EDUV") || value.length != 11) {
-                      return "ERROR: Please enter a valid student number. Eg EDUVxxxxxxx";
+                    } 
+                    //EDUVxxxxxxx (Eduv type) and H2H2H2H22 (9 DIGIT type student numbers)
+                    else if (!RegExp(r'^EDUV\d{7}$', caseSensitive: false).hasMatch(value) && RegExp(r'^[A-Z0-9]{9}$', caseSensitive: false).hasMatch(value)) {
+                      return 'Enter a valid student number';
                     }
+
                     return null;
                   },
                 ),
