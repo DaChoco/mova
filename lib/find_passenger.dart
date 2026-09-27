@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 class FindPassengerScreen extends StatelessWidget {
   const FindPassengerScreen({super.key});
@@ -18,46 +19,16 @@ class FindPassengerScreen extends StatelessWidget {
 
       body: Column(
         children: [
-          // Map area
-          Container(
+          // Map - Using MapLibre
+          SizedBox(
             height: 260,
             width: double.infinity,
-            color: colorScheme.surfaceContainerHighest,
-            child: Stack(
-              children: [
-                Center(
-                  child: Icon(
-                    Icons.map,
-                    size: 70,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-
-                Positioned(
-                  top: 20,
-                  left: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: const Text(
-                      'Map coming soon',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
+            child: MapLibreMap(
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(-33.88, 18.63),
+                zoom: 11,
+              ),
+              styleString: 'https://tiles.openfreemap.org/styles/bright',
             ),
           ),
 
@@ -86,7 +57,10 @@ class FindPassengerScreen extends StatelessWidget {
               children: [
                 const Text(
                   'Passengers Looking for Rides',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
 
                 IconButton(
@@ -153,7 +127,10 @@ class FindPassengerScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                const CircleAvatar(radius: 25, child: Icon(Icons.person)),
+                const CircleAvatar(
+                  radius: 25,
+                  child: Icon(Icons.person),
+                ),
 
                 const SizedBox(width: 12),
 

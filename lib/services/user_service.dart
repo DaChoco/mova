@@ -10,7 +10,7 @@ class UserService {
     required this.baseurl,
   });
 
-  // /api/user/{1}
+  // /api/user/{1} (GET)
 
   Future<User>getUser(String userToken, String ID) async {
     final url = Uri.parse('$baseurl/api/user/$ID');
@@ -30,6 +30,23 @@ class UserService {
     );
 
   }
+// api/user/{} (PUT)
+
+Future<User> updateUser (String userToken, String id) async {
+  final url = Uri.parse('$baseurl/api/user/$id');
+
+  final response = await http.put(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $userToken'});
+
+  if (response.statusCode == 200){
+    final json = jsonDecode(response.body);
+    return User.fromJson(json);
+  }
+  throw Exception(
+      'Failed to check rating. '
+      'Status code: ${response.statusCode}',
+    );
+}
+
 //api/user/{}/rating
 Future<UserRating> getUserRating(String userToken, String userID) async{
   final url = Uri.parse('$baseurl/api/user/$userID');
@@ -46,12 +63,12 @@ Future<UserRating> getUserRating(String userToken, String userID) async{
     );
 
 }
-// api/user/{}/update
+
 
 // /api/user/location/saved - POST
   Future<SavedLocation> addSavedLocation(String userToken) async{
     final url = Uri.parse('$baseurl/api/user/location/saved');
-    final response = await http.get(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $userToken'});
+    final response = await http.post(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $userToken'});
 
     if (response.statusCode == 200){
       final json = jsonDecode(response.body);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 class FindDriverScreen extends StatefulWidget {
   const FindDriverScreen({super.key});
@@ -20,7 +21,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       body: Stack(
         children: [
           // --- Map layer (placeholder for now) ---
-          _buildMapPlaceholder(),
+          _buildMap(),
 
           // --- Back button, floating over the map ---
           SafeArea(
@@ -76,16 +77,15 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     );
   }
 
-  Widget _buildMapPlaceholder() {
-    return Container(
-      color: const Color(0xFFF2F2F2),
-      alignment: Alignment.center,
-      child: const Text(
-        'Map of Location',
-        style: TextStyle(fontSize: 16, color: Colors.black54),
-      ),
-    );
-  }
+  Widget _buildMap() {
+  return MapLibreMap(
+    initialCameraPosition: const CameraPosition(
+      target: LatLng(-33.88, 18.63),
+      zoom: 11,
+    ),
+    styleString: 'https://tiles.openfreemap.org/styles/bright',
+  );
+}
 
   Widget _buildDragHandle() {
     return Padding(
