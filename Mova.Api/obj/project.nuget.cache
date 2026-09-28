@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "oq21PFU7gHE=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\T15\\source\\repos\\Mova\\mova\\Mova.Api\\Mova.Api.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\T15\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.12\\microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
+    "C:\\Users\\T15\\.nuget\\packages\\microsoft.openapi\\2.12.0\\microsoft.openapi.2.12.0.nupkg.sha512"
+  ],
+  "logs": []
+}
