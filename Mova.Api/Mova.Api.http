@@ -1,6 +1,78 @@
-@Mova.Api_HostAddress = http://localhost:5228
+@Mova_HostAddress = http://localhost:5228
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwNjgyNTU2LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.Vqn0Z0qzKz9raKb3jnLZOq5Puj_Zuuaz5OydE6GlsBk
 
-GET {{Mova.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Register a new user
+POST {{Mova_HostAddress}}/api/auth/register
+Content-Type: application/json
 
-###
+{
+  "studentName": "John",
+  "studentSurname": "Smith",
+  "studentNumber": "EDUV1234567",
+  "password": "Test1234!"
+}
+
+### Login
+# Copy the "jwt" value from the response into @token above, then save this file
+POST {{Mova_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "studentNumber": "EDUV1234567",
+  "password": "Test1234!"
+}
+
+### Register a second user (useful once Ride/driver testing needs two accounts)
+POST {{Mova_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "studentName": "Jane",
+  "studentSurname": "Doe",
+  "studentNumber": "EDUV7654321",
+  "password": "Test1234!"
+}
+
+### Try registering the same student number again (should 409 Conflict)
+POST {{Mova_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "studentName": "John",
+  "studentSurname": "Smith",
+  "studentNumber": "EDUV1234567",
+  "password": "Test1234!"
+}
+
+### Login with wrong password (should 401 Unauthorized)
+POST {{Mova_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "studentNumber": "EDUV1234567",
+  "password": "WrongPassword"
+}
+
+### Get user by id (needs a valid token)
+GET {{Mova_HostAddress}}/api/user/1
+Authorization: Bearer {{token}}
+
+### Get user by id with NO token (should 401 Unauthorized)
+GET {{Mova_HostAddress}}/api/user/1
+
+### Get user that doesn't exist (should 404 Not Found)
+GET {{Mova_HostAddress}}/api/user/999
+Authorization: Bearer {{token}}
+
+### Get messages for a ride (empty array until Ride model exists and messages are seeded)
+GET {{Mova_HostAddress}}/api/rides/1/messages
+Authorization: Bearer {{token}}
+
+### Send a message on a ride (currently a stub, always returns success)
+POST {{Mova_HostAddress}}/api/rides/1/messages
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "I'm waiting near the main entrance."
+}
