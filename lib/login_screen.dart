@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'register_screen.dart';
 import 'models/auth.dart';
+import 'services/auth_service.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,6 +19,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
 
   bool _hidePassword = true;
+  bool _isLoggingIn = false;
+
+  // Change this to the backend URL provided by your backend team.
+  final AuthService _authService = AuthService(
+    baseUrl: 'http://26.223.171.250:80',
+  );
 
   @override
   void dispose() {
@@ -26,15 +33,41 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
-    if (_formKey.currentState!.validate()) {
-      final request = LoginRequest(
-        studentNumber: studentNumberController.text,
-        password: passwordController.text,
-      );
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      print(request.studentNumber);
-      print(request.password);
+    final request = LoginRequest(
+      studentNumber: studentNumberController.text.trim(),
+      password: passwordController.text,
+    );
+
+    setState(() {
+      _isLoggingIn = true;
+    });
+
+    try {
+      await _authService.login(request);
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoggingIn = false;
+        });
+      }
     }
   }
 
@@ -71,9 +104,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your student number';
-                    } 
-                    //EDUVxxxxxxx (Eduv type) and H2H2H2H22 (9 DIGIT type student numbers)
-                    else if (!RegExp(r'^EDUV\d{7}$', caseSensitive: false).hasMatch(value) && RegExp(r'^[A-Z0-9]{9}$', caseSensitive: false).hasMatch(value)) {
+                    } else if (!RegExp(
+                          r'^EDUV\d{7}$',
+                          caseSensitive: false,
+                        ).hasMatch(value) &&
+                        !RegExp(
+                          r'^[A-Z0-9]{9}$',
+                          caseSensitive: false,
+                        ).hasMatch(value)) {
                       return 'Enter a valid student number';
                     }
 
@@ -117,16 +155,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TEMPORARY LOGIN
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomeScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Login'),
+                    onPressed: _isLoggingIn ? null : _login,
+                    child: _isLoggingIn
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(),
+                          )
+                        : const Text('Login'),
                   ),
                 ),
 
