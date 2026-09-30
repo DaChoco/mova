@@ -1,41 +1,38 @@
 //MODELS
 // THESE ARE DATA CLASSES TO SIMPLIFY OUR REQUESTS BACK AND FORTH FOR THE FRONT END AND BACKEND
-// C# 
+// C#
 class LoginRequest {
   final String studentNumber;
   final String password;
 
-  LoginRequest({
-    required this.studentNumber,
-    required this.password
-  });
+  LoginRequest({required this.studentNumber, required this.password});
 
   Map<String, dynamic> toJson() {
-    return {
-      'studentNumber': studentNumber,
-      'password': password
-
-    };
+    return {'studentNumber': studentNumber, 'password': password};
   }
-
-  
 }
 
 class LoginResponse {
   final String jwt;
+  final String refreshToken;
   final bool success;
 
   LoginResponse({
     required this.jwt,
+    required this.refreshToken,
     required this.success,
   });
 
-  factory LoginResponse.fromJson(Map<String, dynamic> json){
-    return LoginResponse(jwt: json['jwt'], success: json['success']);
-  }}
+  factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    return LoginResponse(
+      jwt: json['jwt'],
+      refreshToken: json['refreshToken'],
+      success: json['success'],
+    );
+  }
+}
 
 //-------------------------------------------------------
-
 
 class RegisterRequest {
   final String studentName;
@@ -47,7 +44,7 @@ class RegisterRequest {
     required this.studentName,
     required this.studentSurname,
     required this.studentNumber,
-    required this.password
+    required this.password,
   });
 
   Map<String, dynamic> toJson() {
@@ -55,22 +52,27 @@ class RegisterRequest {
       'studentName': studentName,
       'studentSurname': studentSurname,
       'studentNumber': studentNumber,
-      'password': password
-
+      'password': password,
     };
   }
 }
 
 class RegisterResponse {
   final String jwt;
+  final String refreshToken;
   final bool success;
 
   RegisterResponse({
     required this.jwt,
+    required this.refreshToken,
     required this.success,
   });
 
-  factory RegisterResponse.fromJson(Map<String, dynamic> json){
-    return RegisterResponse(jwt: json['jwt'], success: json['success']);
+  factory RegisterResponse.fromJson(Map<String, dynamic> json) {
+    return RegisterResponse(
+      jwt: json['jwt'],
+      refreshToken: json['refreshToken'],
+      success: json['success'],
+    );
   }
 }
