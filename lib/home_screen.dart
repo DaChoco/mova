@@ -229,7 +229,11 @@ class HomeScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const MessageScreen(),
+                              builder: (context) => const MessageScreen(
+                                conversationId: 'test-conversation-id',
+                                currentUserId: 'test-user-id',
+                                otherUserName: 'John Doe',
+                              ),
                             ),
                           );
                         },
