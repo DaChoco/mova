@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'login_screen.dart';
 import 'models/auth.dart';
+import 'services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -21,6 +22,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
+  bool _isRegistering = false;
+
+  // Use the same backend address that worked for your login.
+  final AuthService _authService = AuthService(
+    baseUrl: 'http://26.223.171.250:80',
+  );
 
   @override
   void dispose() {
@@ -32,20 +39,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _register() {
-    if (_formKey.currentState!.validate()) {
-      final request = RegisterRequest(
-        studentName: studentNameController.text,
-        studentSurname: studentSurnameController.text,
-        studentNumber: studentNumberController.text,
-        password: passwordController.text,
-      );
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      // TESTING
-      print(request.studentName);
-      print(request.studentSurname);
-      print(request.studentNumber);
-      print(request.password);
+    setState(() {
+      _isRegistering = true;
+    });
+
+    final request = RegisterRequest(
+      studentName: studentNameController.text.trim(),
+      studentSurname: studentSurnameController.text.trim(),
+      studentNumber: studentNumberController.text.trim(),
+      password: passwordController.text,
+    );
+
+    try {
+      await _authService.register(request);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Registration successful!')));
+
+      // Return to the login screen after successful registration.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRegistering = false;
+        });
+      }
     }
   }
 
@@ -81,13 +116,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: (value) {
                       final RegExp regularExpression = RegExp(
-                        r"^[\p{L} '-]{2,60}$",
+                        r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
                       );
 
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your name';
-                      } else if (!regularExpression.hasMatch(value)) {
-                        return 'Please enter your real name';
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your surname';
+                      } else if (!regularExpression.hasMatch(value.trim())) {
+                        return 'Please enter a valid surname';
                       }
 
                       return null;
@@ -107,13 +142,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: (value) {
                       final RegExp regularExpression = RegExp(
-                        r"^[\p{L} '-]{2,60}$",
+                        r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
                       );
 
-                      if (value == null || value.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Please enter your surname';
-                      } else if (!regularExpression.hasMatch(value)) {
-                        return 'Please enter your real surname';
+                      } else if (!regularExpression.hasMatch(value.trim())) {
+                        return 'Please enter a valid surname';
                       }
 
                       return null;
@@ -135,9 +170,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your student number';
-                      } else if (!RegExp(r'^EDUV\d{7}$', caseSensitive: false).hasMatch(value) && RegExp(r'^[A-Z0-9]{9}$', caseSensitive: false).hasMatch(value)) {
+                      } else if (!RegExp(
+                            r'^EDUV\d{7}$',
+                            caseSensitive: false,
+                          ).hasMatch(value) &&
+                          !RegExp(
+                            r'^[A-Z0-9]{9}$',
+                            caseSensitive: false,
+                          ).hasMatch(value)) {
                         return 'Enter a valid student number';
-                    }
+                      }
 
                       return null;
                     },
@@ -219,11 +261,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _register,
-                      child: const Text(
-                        'Register',
-                        style: TextStyle(fontSize: 18),
-                      ),
+                      onPressed: _isRegistering ? null : _register,
+                      child: _isRegistering
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Register',
+                              style: TextStyle(fontSize: 18),
+                            ),
                     ),
                   ),
 
@@ -231,14 +279,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                   // Login link
                   TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: _isRegistering
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LoginScreen(),
+                              ),
+                            );
+                          },
                     child: const Text(
                       'Already have an account? Login',
                       style: TextStyle(fontSize: 16),
