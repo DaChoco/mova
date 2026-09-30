@@ -145,4 +145,9 @@ class AuthService {
       'Failed to load user. Server returned ${response.statusCode}',
     );
   }
+
+  Future<void> logout() async {
+    await storage.delete(key: 'jwt');
+    await storage.delete(key: 'refreshToken');
+  }
 }

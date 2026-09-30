@@ -6,6 +6,8 @@ import 'message_screen.dart';
 import 'find_driver_screen.dart';
 import 'find_passenger.dart';
 import 'models/auth.dart';
+import 'services/auth_service.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final User user;
@@ -98,8 +100,22 @@ class HomeScreen extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Logout', style: TextStyle(fontSize: 16)),
-                onTap: () {
-                  print('Logout pressed');
+                onTap: () async {
+                  final authService = AuthService(
+                    baseUrl: 'http://26.223.171.250:80',
+                  );
+
+                  await authService.logout();
+
+                  if (!context.mounted) return;
+
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                    (route) => false,
+                  );
                 },
               ),
 
