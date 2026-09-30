@@ -30,6 +30,22 @@ Content-Type: application/json
   "password": "Test1234!"
 }
 
+### Logout
+POST {{Mova_HostAddress}}/api/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "c6it2IOaq3KUencas8YJcTbXR2FTemqOyTLi0lV/GcHs2jwYF4JbvhSIS69N8K9LR/Rf6yyFTx2FzzQfjbp9bA=="
+}
+
+### Try to refresh using the now-revoked token (should 401)
+POST {{Mova_HostAddress}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "c6it2IOaq3KUencas8YJcTbXR2FTemqOyTLi0lV/GcHs2jwYF4JbvhSIS69N8K9LR/Rf6yyFTx2FzzQfjbp9bA=="
+}
+
 ### Register a second user (useful once Ride/driver testing needs two accounts)
 POST {{Mova_HostAddress}}/api/auth/register
 Content-Type: application/json
