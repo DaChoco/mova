@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +41,15 @@ public class AuthController : ControllerBase
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        return Ok(new { success = true, jwt = CreateToken(user), user = ToDto(user) });
+        var refreshToken = await IssueRefreshToken(user.UserId);
+
+        return Ok(new
+        {
+            success = true,
+            jwt = CreateAccessToken(user),
+            refreshToken = refreshToken.Token,
+            user = ToDto(user)
+        });
     }
 
     [HttpPost("login")]
@@ -51,10 +60,74 @@ public class AuthController : ControllerBase
         if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new { success = false, message = "Invalid credentials." });
 
-        return Ok(new { success = true, jwt = CreateToken(user), user = ToDto(user) });
+        var refreshToken = await IssueRefreshToken(user.UserId);
+
+        return Ok(new
+        {
+            success = true,
+            jwt = CreateAccessToken(user),
+            refreshToken = refreshToken.Token,
+            user = ToDto(user)
+        });
     }
 
-    private string CreateToken(User user)
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(RefreshRequest req)
+    {
+        var existing = await _db.RefreshTokens
+            .Include(rt => rt.User)
+            .FirstOrDefaultAsync(rt => rt.Token == req.RefreshToken);
+
+        if (existing is null || !existing.IsActive)
+            return Unauthorized(new { success = false, message = "Invalid or expired refresh token." });
+
+        // Rotation: revoke the used one, issue a brand new pair
+        existing.RevokedAt = DateTime.UtcNow;
+        var newRefreshToken = await IssueRefreshToken(existing.UserId);
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            jwt = CreateAccessToken(existing.User!),
+            refreshToken = newRefreshToken.Token
+        });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(RefreshRequest req)
+    {
+        var existing = await _db.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == req.RefreshToken);
+        if (existing is not null)
+        {
+            existing.RevokedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+        return Ok(new { success = true });
+    }
+
+    private async Task<RefreshToken> IssueRefreshToken(int userId)
+    {
+        var days = double.Parse(_config["Jwt:RefreshTokenExpiryDays"]!);
+        var token = new RefreshToken
+        {
+            Token = GenerateSecureToken(),
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(days)
+        };
+        _db.RefreshTokens.Add(token);
+        await _db.SaveChangesAsync();
+        return token;
+    }
+
+    private static string GenerateSecureToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(64);
+        return Convert.ToBase64String(bytes);
+    }
+
+    private string CreateAccessToken(User user)
     {
         var jwt = _config.GetSection("Jwt");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
