@@ -1,4 +1,4 @@
-@Mova_HostAddress = http://localhost:5228
+@Mova_HostAddress = http://26.223.171.250
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwNjgyNTU2LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.Vqn0Z0qzKz9raKb3jnLZOq5Puj_Zuuaz5OydE6GlsBk
 
 ### Register a new user

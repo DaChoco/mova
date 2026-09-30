@@ -31,6 +31,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FlutterWeb", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -38,6 +48,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseCors("FlutterWeb");
 app.UseHttpsRedirection();
 app.UseAuthentication();   // must come before UseAuthorization
 app.UseAuthorization();
