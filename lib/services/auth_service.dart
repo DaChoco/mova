@@ -99,4 +99,50 @@ class AuthService {
 
     return null;
   }
+
+  Future<User> getUser() async {
+    final jwt = await storage.read(key: 'jwt');
+
+    if (jwt == null) {
+      throw Exception('No login token found');
+    }
+
+    // JWT format: header.payload.signature
+    final parts = jwt.split('.');
+
+    if (parts.length != 3) {
+      throw Exception('Invalid login token');
+    }
+
+    // Decode the JWT payload
+    final payload = parts[1];
+
+    final normalizedPayload = base64Url.normalize(payload);
+
+    final payloadBytes = base64Url.decode(normalizedPayload);
+
+    final payloadData = jsonDecode(utf8.decode(payloadBytes));
+
+    // The backend puts the user ID in the "sub" claim.
+    final userId = int.parse(payloadData['sub'].toString());
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/user/$userId'),
+      headers: {'Authorization': 'Bearer $jwt'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return User.fromJson(data['user']);
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired');
+    }
+
+    throw Exception(
+      'Failed to load user. Server returned ${response.statusCode}',
+    );
+  }
 }

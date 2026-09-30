@@ -76,3 +76,29 @@ class RegisterResponse {
     );
   }
 }
+
+class User {
+  final int userId;
+  final String studentNumber;
+  final String firstName;
+  final String surname;
+  final int? carID;
+
+  User({
+    required this.userId,
+    required this.studentNumber,
+    required this.firstName,
+    required this.surname,
+    this.carID,
+  });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      userId: json['userId'],
+      studentNumber: json['studentNumber'],
+      firstName: json['firstName'],
+      surname: json['surname'],
+      carID: json['carID'],
+    );
+  }
+}

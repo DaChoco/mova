@@ -5,9 +5,12 @@ import 'main.dart';
 import 'message_screen.dart';
 import 'find_driver_screen.dart';
 import 'find_passenger.dart';
+import 'models/auth.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final User user;
+
+  const HomeScreen({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +32,8 @@ class HomeScreen extends StatelessWidget {
 
                     const SizedBox(height: 12),
 
-                    const Text(
-                      'John Doe',
+                    Text(
+                      '${user.firstName} ${user.surname}',
                       style: TextStyle(
                         fontSize: 21,
                         fontWeight: FontWeight.bold,
@@ -39,8 +42,8 @@ class HomeScreen extends StatelessWidget {
 
                     const SizedBox(height: 4),
 
-                    const Text(
-                      'EDUV1234567',
+                    Text(
+                      user.studentNumber,
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                   ],

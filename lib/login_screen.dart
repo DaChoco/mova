@@ -21,7 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _hidePassword = true;
   bool _isLoggingIn = false;
 
-  // Change this to the backend URL provided by your backend team.
   final AuthService _authService = AuthService(
     baseUrl: 'http://26.223.171.250:80',
   );
@@ -48,13 +47,17 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // Login and save the JWT
       await _authService.login(request);
+
+      // Get the logged-in user's details
+      final user = await _authService.getUser();
 
       if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => HomeScreen(user: user)),
       );
     } catch (e) {
       if (!mounted) return;
@@ -145,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your password';
                     }
+
                     return null;
                   },
                 ),
@@ -167,14 +171,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _isLoggingIn
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const RegisterScreen(),
+                            ),
+                          );
+                        },
                   child: const Text(
                     'Already have an account? Register',
                     style: TextStyle(fontSize: 16),
