@@ -3,17 +3,39 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-class ProfileScreen extends StatefulWidget {
+class UserSession {
+  final String id; // MongoDB _id
   final String name;
   final String surname;
   final String email;
+  final String studentNumber;
 
-  const ProfileScreen({
-    super.key,
-    this.name = 'John',
-    this.surname = 'Doe',
-    this.email = 'john.doe@eduvos.com',
+  const UserSession({
+    required this.id,
+    required this.name,
+    required this.surname,
+    required this.email,
+    required this.studentNumber,
   });
+
+  // Build from the backend's login response
+  factory UserSession.fromJson(Map<String, dynamic> json) => UserSession(
+    id: json['_id'],
+    name: json['name'],
+    surname: json['surname'],
+    email: json['email'],
+    studentNumber: json['studentNumber'],
+  );
+}
+
+// Set this after a successful login, clear it on logout
+final ValueNotifier<UserSession?> currentUserNotifier = ValueNotifier(null);
+
+// Shared so the profile screen and the drawer show the same picture
+final ValueNotifier<File?> profileImageNotifier = ValueNotifier(null);
+
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -29,7 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _plateController = TextEditingController();
   final _seatsController = TextEditingController();
 
-  File? _profileImage;
   final ImagePicker _picker = ImagePicker();
 
   bool _hideOld = true;
@@ -58,9 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (picked != null) {
-      setState(() {
-        _profileImage = File(picked.path);
-      });
+      profileImageNotifier.value = File(picked.path);
     }
   }
 
@@ -127,6 +146,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = currentUserNotifier.value;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -157,13 +178,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 30),
 
               // Static details
-              _buildInfoField('Name', widget.name, Icons.person_outline),
+              _buildInfoField('Name', user?.name ?? '-', Icons.person_outline),
               const SizedBox(height: 20),
-              _buildInfoField('Surname', widget.surname, Icons.person_outline),
+              _buildInfoField(
+                'Surname',
+                user?.surname ?? '-',
+                Icons.person_outline,
+              ),
+              const SizedBox(height: 20),
+              _buildInfoField(
+                'Student Number',
+                user?.studentNumber ?? '-',
+                Icons.badge_outlined,
+              ),
               const SizedBox(height: 20),
               _buildInfoField(
                 'Student Email',
-                widget.email,
+                user?.email ?? '-',
                 Icons.email_outlined,
               ),
 
@@ -330,21 +361,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       onTap: _pickProfileImage,
       child: Stack(
         children: [
-          CircleAvatar(
-            radius: 55,
-            backgroundColor: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest,
-            backgroundImage: _profileImage != null
-                ? FileImage(_profileImage!)
-                : null,
-            child: _profileImage == null
-                ? Icon(
-                    Icons.person,
-                    size: 55,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  )
-                : null,
+          ValueListenableBuilder(
+            valueListenable: profileImageNotifier,
+            builder: (context, image, child) {
+              return CircleAvatar(
+                radius: 55,
+                backgroundColor: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest,
+                backgroundImage: image != null ? FileImage(image) : null,
+                child: image == null
+                    ? Icon(
+                        Icons.person,
+                        size: 55,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      )
+                    : null,
+              );
+            },
           ),
 
           Positioned(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'profile_screen.dart';
@@ -5,14 +7,9 @@ import 'main.dart';
 import 'message_screen.dart';
 import 'find_driver_screen.dart';
 import 'find_passenger.dart';
-import 'models/auth.dart';
-import 'services/auth_service.dart';
-import 'login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  final User user;
-
-  const HomeScreen({super.key, required this.user});
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,34 +19,52 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             children: [
               // Profile section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const CircleAvatar(
-                      radius: 45,
-                      child: Icon(Icons.person, size: 50),
+              ValueListenableBuilder<UserSession?>(
+                valueListenable: currentUserNotifier,
+                builder: (context, user, child) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        ValueListenableBuilder<File?>(
+                          valueListenable: profileImageNotifier,
+                          builder: (context, image, child) {
+                            return CircleAvatar(
+                              radius: 45,
+                              backgroundImage: image != null
+                                  ? FileImage(image)
+                                  : null,
+                              child: image == null
+                                  ? const Icon(Icons.person, size: 50)
+                                  : null,
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        Text(
+                          user != null ? '${user.name} ${user.surname}' : '-',
+                          style: const TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          user?.studentNumber ?? '-',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
-
-                    const SizedBox(height: 12),
-
-                    Text(
-                      '${user.firstName} ${user.surname}',
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      user.studentNumber,
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
 
               const Divider(),
@@ -100,22 +115,8 @@ class HomeScreen extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Logout', style: TextStyle(fontSize: 16)),
-                onTap: () async {
-                  final authService = AuthService(
-                    baseUrl: 'http://26.223.171.250:80',
-                  );
-
-                  await authService.logout();
-
-                  if (!context.mounted) return;
-
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                    (route) => false,
-                  );
+                onTap: () {
+                  print('Logout pressed');
                 },
               ),
 
