@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../models/auth.dart';
 
@@ -25,6 +26,9 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+
+      print('PROFILE UPLOAD STATUS: ${response.statusCode}');
+      print('PROFILE UPLOAD RESPONSE: ${response.body}');
 
       // Save tokens if the backend provides them
       if (data['jwt'] != null && data['refreshToken'] != null) {
@@ -68,7 +72,6 @@ class AuthService {
 
   Future<void> _saveTokens(String jwt, String refreshToken) async {
     await storage.write(key: 'jwt', value: jwt);
-
     await storage.write(key: 'refreshToken', value: refreshToken);
   }
 
@@ -143,6 +146,55 @@ class AuthService {
 
     throw Exception(
       'Failed to load user. Server returned ${response.statusCode}',
+    );
+  }
+
+  // Uploads the user's profile picture to the backend.
+  Future<String> uploadProfilePicture(XFile image) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found');
+    }
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/user/profile-picture'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+
+    final bytes = await image.readAsBytes();
+
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: image.name),
+    );
+
+    final streamedResponse = await request.send();
+
+    final response = await http.Response.fromStream(streamedResponse);
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['url'];
+    }
+
+    if (response.statusCode == 400) {
+      throw Exception(data['message'] ?? 'Invalid profile picture.');
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    if (response.statusCode == 404) {
+      throw Exception('User account could not be found.');
+    }
+
+    throw Exception(
+      data['message'] ??
+          'Profile picture upload failed. Server returned ${response.statusCode}.',
     );
   }
 

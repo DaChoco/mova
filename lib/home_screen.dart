@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -29,13 +30,13 @@ class HomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    ValueListenableBuilder<File?>(
+                    ValueListenableBuilder<Uint8List?>(
                       valueListenable: profileImageNotifier,
                       builder: (context, image, child) {
                         return CircleAvatar(
                           radius: 45,
                           backgroundImage: image != null
-                              ? FileImage(image)
+                              ? MemoryImage(image)
                               : null,
                           child: image == null
                               ? const Icon(Icons.person, size: 50)
@@ -79,7 +80,7 @@ class HomeScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ProfileScreen(),
+                        builder: (context) => ProfileScreen(user: user),
                       ),
                     );
                   },

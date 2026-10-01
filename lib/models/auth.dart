@@ -1,6 +1,9 @@
 //MODELS
+
 // THESE ARE DATA CLASSES TO SIMPLIFY OUR REQUESTS BACK AND FORTH FOR THE FRONT END AND BACKEND
+
 // C#
+
 class LoginRequest {
   final String studentNumber;
   final String password;
@@ -77,12 +80,15 @@ class RegisterResponse {
   }
 }
 
+//-------------------------------------------------------
+
 class User {
   final int userId;
   final String studentNumber;
   final String firstName;
   final String surname;
   final int? carID;
+  final String? profileIcon;
 
   User({
     required this.userId,
@@ -90,6 +96,7 @@ class User {
     required this.firstName,
     required this.surname,
     this.carID,
+    this.profileIcon,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -99,9 +106,12 @@ class User {
       firstName: json['firstName'],
       surname: json['surname'],
       carID: json['carID'],
+      profileIcon: json['profileIcon'],
     );
   }
 }
+
+//-------------------------------------------------------
 
 class ChangePasswordRequest {
   final String currentPassword;
