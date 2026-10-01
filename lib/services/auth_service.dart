@@ -150,4 +150,44 @@ class AuthService {
     await storage.delete(key: 'jwt');
     await storage.delete(key: 'refreshToken');
   }
+
+  Future<void> changePassword(ChangePasswordRequest request) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/user/change-password'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(request.toJson()),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data['success'] == true) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception(data['message'] ?? 'Current password is incorrect.');
+    }
+
+    if (response.statusCode == 400) {
+      throw Exception(data['message'] ?? 'Invalid password.');
+    }
+
+    if (response.statusCode == 404) {
+      throw Exception('User account could not be found.');
+    }
+
+    throw Exception(
+      data['message'] ??
+          'Password change failed. Server returned ${response.statusCode}.',
+    );
+  }
 }
