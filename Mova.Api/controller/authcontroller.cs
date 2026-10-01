@@ -41,13 +41,13 @@ public class AuthController : ControllerBase
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        var refreshToken = await IssueRefreshToken(user.UserId);
+        var (_, plainRefreshToken) = await IssueRefreshToken(user.UserId);
 
         return Ok(new
         {
             success = true,
             jwt = CreateAccessToken(user),
-            refreshToken = refreshToken.Token,
+            refreshToken = plainRefreshToken,
             user = ToDto(user)
         });
     }
@@ -60,13 +60,13 @@ public class AuthController : ControllerBase
         if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new { success = false, message = "Invalid credentials." });
 
-        var refreshToken = await IssueRefreshToken(user.UserId);
+        var (_, plainRefreshToken) = await IssueRefreshToken(user.UserId);
 
         return Ok(new
         {
             success = true,
             jwt = CreateAccessToken(user),
-            refreshToken = refreshToken.Token,
+            refreshToken = plainRefreshToken,
             user = ToDto(user)
         });
     }
@@ -74,30 +74,34 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(RefreshRequest req)
     {
+        var incomingHash = HashToken(req.RefreshToken);
+
         var existing = await _db.RefreshTokens
             .Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == req.RefreshToken);
+            .FirstOrDefaultAsync(rt => rt.TokenHash == incomingHash);
 
         if (existing is null || !existing.IsActive)
             return Unauthorized(new { success = false, message = "Invalid or expired refresh token." });
 
         // Rotation: revoke the used one, issue a brand new pair
         existing.RevokedAt = DateTime.UtcNow;
-        var newRefreshToken = await IssueRefreshToken(existing.UserId);
+        var (_, newPlainToken) = await IssueRefreshToken(existing.UserId);
         await _db.SaveChangesAsync();
 
         return Ok(new
         {
             success = true,
             jwt = CreateAccessToken(existing.User!),
-            refreshToken = newRefreshToken.Token
+            refreshToken = newPlainToken
         });
     }
 
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest req)
     {
-        var existing = await _db.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == req.RefreshToken);
+        var incomingHash = HashToken(req.RefreshToken);
+
+        var existing = await _db.RefreshTokens.FirstOrDefaultAsync(rt => rt.TokenHash == incomingHash);
         if (existing is not null)
         {
             existing.RevokedAt = DateTime.UtcNow;
@@ -106,24 +110,34 @@ public class AuthController : ControllerBase
         return Ok(new { success = true });
     }
 
-    private async Task<RefreshToken> IssueRefreshToken(int userId)
+    private async Task<(RefreshToken entity, string plainToken)> IssueRefreshToken(int userId)
     {
         var days = double.Parse(_config["Jwt:RefreshTokenExpiryDays"]!);
-        var token = new RefreshToken
+        var plainToken = GenerateSecureToken();
+
+        var entity = new RefreshToken
         {
-            Token = GenerateSecureToken(),
+            TokenHash = HashToken(plainToken),
             UserId = userId,
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddDays(days)
         };
-        _db.RefreshTokens.Add(token);
+
+        _db.RefreshTokens.Add(entity);
         await _db.SaveChangesAsync();
-        return token;
+
+        return (entity, plainToken); // plainToken is sent to the client, never stored
     }
 
     private static string GenerateSecureToken()
     {
         var bytes = RandomNumberGenerator.GetBytes(64);
+        return Convert.ToBase64String(bytes);
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToBase64String(bytes);
     }
 

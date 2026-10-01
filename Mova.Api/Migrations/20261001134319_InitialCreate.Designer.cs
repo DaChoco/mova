@@ -11,7 +11,7 @@ using Mova.Api.Data;
 namespace Mova.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260930122354_InitialCreate")]
+    [Migration("20261001134319_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -35,7 +35,7 @@ namespace Mova.Api.Migrations
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Token")
+                    b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

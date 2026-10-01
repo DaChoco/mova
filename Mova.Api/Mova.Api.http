@@ -1,12 +1,11 @@
 @Mova_HostAddress = http://26.223.171.250
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwNzc0Nzg3LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.Dfz1cP92mt9LDbovVFw-k5H0mwW78QvnTHtZ01mDlEM
-
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwODY4MzI4LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.C2ddj-Wbf-cfeL5qvAgHVCdOpe40CaDMHdejJBju2FA
 ### Refresh
 POST {{Mova_HostAddress}}/api/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "c6it2IOaq3KUencas8YJcTbXR2FTemqOyTLi0lV/GcHs2jwYF4JbvhSIS69N8K9LR/Rf6yyFTx2FzzQfjbp9bA=="
+  "refreshToken": "wRJ/2m5E/KRX/0VK7tG5VMSdop//Y7an4lm/8e7oCaKPJI850gLyqy5nLNKKi5vCzs7c5Nj32dyIRv5+ODvGkw=="
 }
 
 ### Register a new user
@@ -19,6 +18,7 @@ Content-Type: application/json
   "studentNumber": "EDUV1234567",
   "password": "Test1234!"
 }
+
 
 ### Login
 # Copy the "jwt" value from the response into @token above, then save this file
@@ -88,11 +88,7 @@ GET {{Mova_HostAddress}}/api/user/1
 GET {{Mova_HostAddress}}/api/user/999
 Authorization: Bearer {{token}}
 
-### Get messages for a ride (empty array until Ride model exists and messages are seeded)
-GET {{Mova_HostAddress}}/api/rides/1/messages
-Authorization: Bearer {{token}}
-
-### Send a message on a ride (currently a stub, always returns success)
+### Send a message on a ride
 POST {{Mova_HostAddress}}/api/rides/1/messages
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -100,3 +96,47 @@ Content-Type: application/json
 {
   "message": "I'm waiting near the main entrance."
 }
+
+### Get messages for that ride
+GET {{Mova_HostAddress}}/api/rides/1/messages
+Authorization: Bearer {{token}}
+
+### Change password
+POST {{Mova_HostAddress}}/api/user/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentPassword": "Test1234!",
+  "newPassword": "NewPass5678!"
+}
+
+### Confirm old password no longer works
+POST {{Mova_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "studentNumber": "EDUV1234567",
+  "password": "Test1234!"
+}
+
+### Confirm new password works
+POST {{Mova_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "studentNumber": "EDUV1234567",
+  "password": "NewPass5678!"
+}
+
+### Upload profile picture
+POST {{Mova_HostAddress}}/api/user/profile-picture
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----Boundary123
+
+------Boundary123
+Content-Disposition: form-data; name="file"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./test.jpg
+------Boundary123--

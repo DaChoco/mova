@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("8edc5f0d-1c46-4915-9127-9c9764918973")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("Mova.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a34b94675e2bfdd4a11cf0bc8d6070c57bba8e86")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dad7171b642d54a313dff9702c8c0fe98dcd0dc7")]
 [assembly: System.Reflection.AssemblyProductAttribute("Mova.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Mova.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
