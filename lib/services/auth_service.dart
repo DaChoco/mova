@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:http_parser/http_parser.dart';
 
 import '../models/auth.dart';
 
@@ -26,9 +27,6 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-
-      print('PROFILE UPLOAD STATUS: ${response.statusCode}');
-      print('PROFILE UPLOAD RESPONSE: ${response.body}');
 
       // Save tokens if the backend provides them
       if (data['jwt'] != null && data['refreshToken'] != null) {
@@ -150,11 +148,29 @@ class AuthService {
   }
 
   // Uploads the user's profile picture to the backend.
+
   Future<String> uploadProfilePicture(XFile image) async {
     final token = await storage.read(key: 'jwt');
 
     if (token == null) {
       throw Exception('No login session found');
+    }
+
+    final bytes = await image.readAsBytes();
+
+    // Determine the MIME type from the selected file.
+    final fileName = image.name.toLowerCase();
+
+    MediaType contentType;
+
+    if (fileName.endsWith('.png')) {
+      contentType = MediaType('image', 'png');
+    } else if (fileName.endsWith('.webp')) {
+      contentType = MediaType('image', 'webp');
+    } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+      contentType = MediaType('image', 'jpeg');
+    } else {
+      throw Exception('Please select a JPEG, PNG or WEBP image.');
     }
 
     final request = http.MultipartRequest(
@@ -164,20 +180,36 @@ class AuthService {
 
     request.headers['Authorization'] = 'Bearer $token';
 
-    final bytes = await image.readAsBytes();
-
     request.files.add(
-      http.MultipartFile.fromBytes('file', bytes, filename: image.name),
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: image.name,
+        contentType: contentType,
+      ),
     );
 
     final streamedResponse = await request.send();
 
     final response = await http.Response.fromStream(streamedResponse);
 
+    print('PROFILE UPLOAD STATUS: ${response.statusCode}');
+    print('PROFILE UPLOAD RESPONSE: ${response.body}');
+
     final data = jsonDecode(response.body);
 
     if (response.statusCode == 200 && data['success'] == true) {
-      return data['url'];
+      final returnedUrl = data['url'] as String;
+
+      // The backend currently returns:
+      // /profilepicture/filename.jpg
+      //
+      // Convert it into a complete URL for Flutter.
+      if (returnedUrl.startsWith('http')) {
+        return returnedUrl;
+      }
+
+      return '$baseUrl$returnedUrl';
     }
 
     if (response.statusCode == 400) {
@@ -194,7 +226,8 @@ class AuthService {
 
     throw Exception(
       data['message'] ??
-          'Profile picture upload failed. Server returned ${response.statusCode}.',
+          'Profile picture upload failed. '
+              'Server returned ${response.statusCode}.',
     );
   }
 
