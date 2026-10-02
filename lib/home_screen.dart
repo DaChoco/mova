@@ -6,6 +6,7 @@ import 'profile_screen.dart';
 import 'main.dart';
 import 'find_driver_screen.dart';
 import 'find_passenger.dart';
+import 'chat_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
@@ -236,9 +237,11 @@ class HomeScreen extends StatelessWidget {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Messages screen coming soon'),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ChatsScreen(currentUserId: user.userId.toString()),
                       ),
                     );
                   },

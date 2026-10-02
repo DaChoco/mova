@@ -94,20 +94,34 @@ class ChatService {
         .toList();
   }
 
-  Future<Message> sendMessage(
-    String rideId,
-    int recipientId,
-    String text,
-  ) async {
+  Future<Message> sendMessage(String rideId, String text) async {
     final res = await _call(
       (h) => http.post(
         Uri.parse('$_host/api/rides/$rideId/messages'),
         headers: h,
-        body: jsonEncode({'message': text, 'recipientId': recipientId}),
+        body: jsonEncode({'message': text}),
       ),
     );
     if (res.statusCode != 200) throw Exception('Failed to send message');
     chatsChanged.value++;
     return Message.fromJson(jsonDecode(res.body)['message']);
+  }
+
+  Future<Map<String, dynamic>> getUser(String userId) async {
+    final res = await _call(
+      (h) => http.get(Uri.parse('$_host/api/user/$userId'), headers: h),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception('Failed to load user');
+    }
+
+    final data = jsonDecode(res.body);
+
+    if (data['success'] != true) {
+      throw Exception('Failed to load user');
+    }
+
+    return data['user'] as Map<String, dynamic>;
   }
 }

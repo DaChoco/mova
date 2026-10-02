@@ -36,18 +36,21 @@ class ChatList extends StatefulWidget {
 class _ChatListState extends State<ChatList> {
   final chat.ChatService _service = chat.ChatService();
 
-  late Future<List<Conversation>> _chats;
+  late Future<List<chat.Conversation>> _chats;
 
   @override
   void initState() {
     super.initState();
+
     _chats = _service.getConversations();
-    chatsChanged.addListener(_reload);
+
+    chat.chatsChanged.addListener(_reload);
   }
 
   @override
   void dispose() {
-    chatsChanged.removeListener(_reload);
+    chat.chatsChanged.removeListener(_reload);
+
     super.dispose();
   }
 
@@ -69,7 +72,8 @@ class _ChatListState extends State<ChatList> {
     ).difference(DateTime(t.year, t.month, t.day)).inDays;
 
     if (days == 0) {
-      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      return '${t.hour.toString().padLeft(2, '0')}:'
+          '${t.minute.toString().padLeft(2, '0')}';
     }
 
     return days == 1 ? 'Yesterday' : '${t.day}/${t.month}/${t.year}';
@@ -79,7 +83,7 @@ class _ChatListState extends State<ChatList> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return FutureBuilder<List<Conversation>>(
+    return FutureBuilder<List<chat.Conversation>>(
       future: _chats,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
@@ -133,12 +137,14 @@ class _ChatListState extends State<ChatList> {
         return RefreshIndicator(
           onRefresh: () async {
             _reload();
-            await _chats.catchError((_) => <Conversation>[]);
+
+            await _chats.catchError((_) => <chat.Conversation>[]);
           },
           child: ListView.separated(
             itemCount: chats.length,
-            separatorBuilder: (context, index) =>
-                const Divider(height: 1, indent: 84),
+            separatorBuilder: (context, index) {
+              return const Divider(height: 1, indent: 84);
+            },
             itemBuilder: (context, i) {
               final c = chats[i];
 
@@ -147,10 +153,12 @@ class _ChatListState extends State<ChatList> {
                   horizontal: 16,
                   vertical: 6,
                 ),
+
                 leading: const CircleAvatar(
                   radius: 26,
                   child: Icon(Icons.person),
                 ),
+
                 title: Text(
                   c.otherUserName,
                   style: const TextStyle(
@@ -158,16 +166,19 @@ class _ChatListState extends State<ChatList> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 subtitle: Text(
                   c.lastMessage,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
+
                 trailing: Text(
                   _time(c.updatedAt),
                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
+
                 onTap: () {
                   Navigator.push(
                     context,
@@ -175,7 +186,7 @@ class _ChatListState extends State<ChatList> {
                       builder: (_) => MessageScreen(
                         rideId: c.rideId,
                         currentUserId: widget.currentUserId,
-                        otherUserId: c.otherUserId,
+                        otherUserId: c.otherUserId.toString(),
                         otherUserName: c.otherUserName,
                       ),
                     ),

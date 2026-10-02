@@ -1,127 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
-import 'services/auth_service.dart';
-
-class Message {
-  final String id;
-  final String senderId;
-  final String senderType;
-  final String text;
-  final DateTime sentAt;
-  final bool isRead;
-
-  Message({
-    required this.id,
-    required this.senderId,
-    required this.senderType,
-    required this.text,
-    required this.sentAt,
-    required this.isRead,
-  });
-
-  factory Message.fromJson(Map<String, dynamic> json) {
-    return Message(
-      id: json['messageId'].toString(),
-      senderId: json['senderId'].toString(),
-      senderType: json['senderType']?.toString() ?? '',
-      text: json['message']?.toString() ?? '',
-      sentAt: DateTime.parse(json['sentAt'].toString()),
-      isRead: json['isRead'] ?? false,
-    );
-  }
-}
-
-class ChatService {
-  static const String baseUrl = 'http://26.223.171.250:80';
-
-  final AuthService authService;
-
-  ChatService({required this.authService});
-
-  Future<Map<String, String>> _headers() async {
-    final token = await authService.storage.read(key: 'jwt');
-
-    if (token == null) {
-      throw Exception('No login session found');
-    }
-
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
-
-  Future<List<Message>> getMessages(String rideId) async {
-    final headers = await _headers();
-
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/rides/$rideId/messages'),
-      headers: headers,
-    );
-
-    if (response.statusCode == 401) {
-      throw Exception('Your login session has expired');
-    }
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200 || data['success'] != true) {
-      throw Exception('Failed to load messages');
-    }
-
-    final List<dynamic> messages = data['messages'] ?? [];
-
-    return messages
-        .map((message) => Message.fromJson(message as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<Message> sendMessage(String rideId, String text) async {
-    final headers = await _headers();
-
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/rides/$rideId/messages'),
-      headers: headers,
-      body: jsonEncode({'message': text}),
-    );
-
-    if (response.statusCode == 401) {
-      throw Exception('Your login session has expired');
-    }
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200 || data['success'] != true) {
-      throw Exception('Failed to send message');
-    }
-
-    return Message.fromJson(data['message'] as Map<String, dynamic>);
-  }
-
-  Future<Map<String, dynamic>> getUser(String userId) async {
-    final headers = await _headers();
-
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/user/$userId'),
-      headers: headers,
-    );
-
-    if (response.statusCode == 401) {
-      throw Exception('Your login session has expired');
-    }
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200 || data['success'] != true) {
-      throw Exception('Failed to load user');
-    }
-
-    return data['user'] as Map<String, dynamic>;
-  }
-}
+import 'services/chat_service.dart' as chat;
 
 class MessageScreen extends StatefulWidget {
   final String rideId;
@@ -144,10 +23,9 @@ class MessageScreen extends StatefulWidget {
 class _MessageScreenState extends State<MessageScreen> {
   final TextEditingController messageController = TextEditingController();
 
-  late final AuthService _authService;
-  late final ChatService _chatService;
+  late final chat.ChatService _chatService;
 
-  List<Message> _messages = [];
+  List<chat.Message> _messages = [];
 
   bool _loading = true;
   bool _sending = false;
@@ -161,9 +39,7 @@ class _MessageScreenState extends State<MessageScreen> {
   void initState() {
     super.initState();
 
-    _authService = AuthService(baseUrl: ChatService.baseUrl);
-
-    _chatService = ChatService(authService: _authService);
+    _chatService = chat.ChatService();
 
     _displayName = widget.otherUserName;
 
@@ -281,7 +157,7 @@ class _MessageScreenState extends State<MessageScreen> {
     return const CircleAvatar(radius: 20, child: Icon(Icons.person));
   }
 
-  Widget _messageBubble(Message message) {
+  Widget _messageBubble(chat.Message message) {
     final colorScheme = Theme.of(context).colorScheme;
 
     final bool isMe = message.senderId == widget.currentUserId;
@@ -369,9 +245,7 @@ class _MessageScreenState extends State<MessageScreen> {
         title: Row(
           children: [
             _profileAvatar(),
-
             const SizedBox(width: 10),
-
             Expanded(
               child: Text(
                 _displayName,
@@ -385,7 +259,6 @@ class _MessageScreenState extends State<MessageScreen> {
           ],
         ),
       ),
-
       body: Column(
         children: [
           Expanded(child: _messageList()),
