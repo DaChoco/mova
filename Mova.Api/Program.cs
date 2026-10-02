@@ -7,6 +7,8 @@ using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -18,6 +20,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 var jwt = builder.Configuration.GetSection("Jwt");
 
+// Configure JWT authentication to be used as bearer tokens.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -46,6 +49,8 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// HTTP request pipeline configuration for development and production environments.
 
 if (app.Environment.IsDevelopment())
 {

@@ -7,9 +7,11 @@ using Mova.Api.Dtos;
 
 namespace Mova.Api.Controllers;
 
+// Controller for handling user-related endpoints, such as retrieving user information and managing profile pictures. EVERY endpoint requires authentication via JWT.
+
 [ApiController]
 [Route("api/user")]
-[Authorize]
+[Authorize] // All endpoints in this controller require the user to be authenticated via JWT.
 public class UserController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -18,7 +20,7 @@ public class UserController : ControllerBase
     {
         _db = db;
     }
-
+    //retrieves user information based on the provided user ID.
    [HttpGet("{id}")]
     public async Task<IActionResult> Get(int id)
     {
@@ -41,8 +43,13 @@ public class UserController : ControllerBase
                 : null
         }
     });
+<<<<<<< HEAD
     }
 
+=======
+}
+    /// Changes logged-in user's password after verifying the current password. Revokes all active refresh tokens upon successful password change.
+>>>>>>> 702c1f0883715891961d7a299d09b9ec7219e6f5
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)
     {
@@ -72,6 +79,7 @@ public class UserController : ControllerBase
         return Ok(new { success = true, message = "Password changed successfully." });
     }
 
+    // Uploads a new profile picture for the logged-in user. Validates file type and size, deletes any existing profile picture, and saves the new one.
     [HttpPost("profile-picture")]
     public async Task<IActionResult> UploadProfilePicture(IFormFile file)
     {
@@ -99,7 +107,7 @@ public class UserController : ControllerBase
         if (System.IO.File.Exists(oldPath))
             System.IO.File.Delete(oldPath);
     }
-
+    // Generate a unique filename for the new profile picture and save it to the server.
     var extension = Path.GetExtension(file.FileName);
     var fileName = $"{userId}_{Guid.NewGuid()}{extension}";
     var savePath = Path.Combine("profilepicture", fileName);
