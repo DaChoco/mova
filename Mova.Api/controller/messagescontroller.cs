@@ -76,4 +76,36 @@ public class MessagesController : ControllerBase
             }
         });
     }
+
+
+    [HttpGet]
+    [Route("/api/messages/mine")]
+    [Route("/api/chats")]
+    public async Task<IActionResult> GetMyChats()
+    {
+    var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")!);
+
+    var myMessages = await _mongo.Messages
+        .Find(m => m.SenderId == currentUserId)
+        .ToListAsync();
+
+    var chats = myMessages
+        .GroupBy(m => m.RideId)
+        .Select(group =>
+        {
+            var lastMessage = group.OrderByDescending(m => m.SentAt).First();
+            return new
+            {
+                rideId = group.Key,
+                lastMessage = lastMessage.Message,
+                lastMessageAt = lastMessage.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                lastSenderType = lastMessage.SenderType
+            };
+        })
+        .OrderByDescending(c => c.lastMessageAt)
+        .ToList();
+
+    return Ok(new { success = true, chats });
+    }
 }

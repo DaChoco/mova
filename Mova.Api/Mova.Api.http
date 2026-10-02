@@ -1,5 +1,5 @@
 @Mova_HostAddress = http://26.223.171.250
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwOTQ0ODAyLCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.QVb4l-aBWWb9i97l3NJCJCeApE3lhK_JxgTa_uN-2XU
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwOTUyNzU3LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.E3AV9PmprmkXTlrZipeGeYgIevnnQD5NDRMCiZsvPjc
 ### Refresh
 POST {{Mova_HostAddress}}/api/auth/refresh
 Content-Type: application/json
@@ -99,6 +99,10 @@ Content-Type: application/json
 
 ### Confirm it comes back clean
 GET {{Mova_HostAddress}}/api/rides/1/messages
+Authorization: Bearer {{token}}
+
+### Via the alias the frontend tool expects
+GET {{Mova_HostAddress}}/api/chats
 Authorization: Bearer {{token}}
 
 ### Change password

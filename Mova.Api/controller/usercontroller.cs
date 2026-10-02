@@ -43,13 +43,8 @@ public class UserController : ControllerBase
                 : null
         }
     });
-<<<<<<< HEAD
     }
 
-=======
-}
-    /// Changes logged-in user's password after verifying the current password. Revokes all active refresh tokens upon successful password change.
->>>>>>> 702c1f0883715891961d7a299d09b9ec7219e6f5
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)
     {
