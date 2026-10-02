@@ -11,6 +11,8 @@ using Mova.Api.Models;
 
 namespace Mova.Api.Controllers;
 
+
+/// Controller for handling authentication-related endpoints.  
 [ApiController]
 [Route("api/auth")]
 public class AuthController : ControllerBase
@@ -23,7 +25,7 @@ public class AuthController : ControllerBase
         _db = db;
         _config = config;
     }
-
+/// Registers a new user and returns a JWT and refresh token upon successful registration.
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest req)
     {
@@ -51,7 +53,7 @@ public class AuthController : ControllerBase
             user = ToDto(user)
         });
     }
-
+/// Logs in an existing user and returns a JWT and refresh token upon successful authentication.
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest req)
     {
@@ -71,6 +73,9 @@ public class AuthController : ControllerBase
         });
     }
 
+
+    /// Refreshes the access token using a valid refresh token.
+    
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(RefreshRequest req)
     {
@@ -96,6 +101,7 @@ public class AuthController : ControllerBase
         });
     }
 
+/// Logs out the user by revoking the provided refresh token.
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest req)
     {
@@ -110,6 +116,7 @@ public class AuthController : ControllerBase
         return Ok(new { success = true });
     }
 
+/// Generates refresh token for the user, stores its hash in the database, and returns the plain token to be sent to the client.
     private async Task<(RefreshToken entity, string plainToken)> IssueRefreshToken(int userId)
     {
         var days = double.Parse(_config["Jwt:RefreshTokenExpiryDays"]!);
@@ -140,7 +147,7 @@ public class AuthController : ControllerBase
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToBase64String(bytes);
     }
-
+    /// Creates a JWT access token for the authenticated user.
     private string CreateAccessToken(User user)
     {
         var jwt = _config.GetSection("Jwt");
@@ -161,7 +168,7 @@ public class AuthController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-
+// Converts a User entity to a DTO for API responses.
     private static object ToDto(User u) => new
     {
         userId = u.UserId,

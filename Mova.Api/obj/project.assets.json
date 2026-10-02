@@ -3070,23 +3070,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\T15\\.nuget\\packages\\": {},
+    "C:\\Users\\Biggs\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\T15\\source\\repos\\Mova\\mova\\Mova.Api\\Mova.Api.csproj",
+      "projectUniqueName": "C:\\Users\\Biggs\\Desktop\\latebend\\mova\\Mova.Api\\Mova.Api.csproj",
       "projectName": "Mova.Api",
-      "projectPath": "C:\\Users\\T15\\source\\repos\\Mova\\mova\\Mova.Api\\Mova.Api.csproj",
-      "packagesPath": "C:\\Users\\T15\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\T15\\source\\repos\\Mova\\mova\\Mova.Api\\obj\\",
+      "projectPath": "C:\\Users\\Biggs\\Desktop\\latebend\\mova\\Mova.Api\\Mova.Api.csproj",
+      "packagesPath": "C:\\Users\\Biggs\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Biggs\\Desktop\\latebend\\mova\\Mova.Api\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\T15\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Biggs\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -3095,6 +3095,7 @@
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
