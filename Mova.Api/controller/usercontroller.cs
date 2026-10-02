@@ -41,7 +41,7 @@ public class UserController : ControllerBase
                 : null
         }
     });
-}
+    }
 
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)

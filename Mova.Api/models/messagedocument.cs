@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace Mova.Api.Models;
 
+[BsonIgnoreExtraElements]
 public class MessageDocument
 {
     [BsonId]
@@ -11,7 +12,7 @@ public class MessageDocument
 
     public string RideId { get; set; } = "";
     public int SenderId { get; set; }
-    public string SenderType { get; set; } = ""; // "rider" or "driver"
+    public string SenderType { get; set; } = "";
     public string Message { get; set; } = "";
     public DateTime SentAt { get; set; }
     public bool IsRead { get; set; }

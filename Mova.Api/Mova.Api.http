@@ -1,5 +1,5 @@
 @Mova_HostAddress = http://26.223.171.250
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwODY4MzI4LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.C2ddj-Wbf-cfeL5qvAgHVCdOpe40CaDMHdejJBju2FA
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwOTQ0ODAyLCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.QVb4l-aBWWb9i97l3NJCJCeApE3lhK_JxgTa_uN-2XU
 ### Refresh
 POST {{Mova_HostAddress}}/api/auth/refresh
 Content-Type: application/json
@@ -88,7 +88,7 @@ GET {{Mova_HostAddress}}/api/user/1
 GET {{Mova_HostAddress}}/api/user/999
 Authorization: Bearer {{token}}
 
-### Send a message on a ride
+### Send a fresh message with the new shape
 POST {{Mova_HostAddress}}/api/rides/1/messages
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -97,7 +97,7 @@ Content-Type: application/json
   "message": "I'm waiting near the main entrance."
 }
 
-### Get messages for that ride
+### Confirm it comes back clean
 GET {{Mova_HostAddress}}/api/rides/1/messages
 Authorization: Bearer {{token}}
 
