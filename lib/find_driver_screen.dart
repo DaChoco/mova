@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import 'message_screen.dart';
+import 'models/auth.dart';
+import 'services/auth_service.dart';
+
 class FindDriverScreen extends StatefulWidget {
   const FindDriverScreen({super.key});
 
@@ -9,8 +13,16 @@ class FindDriverScreen extends StatefulWidget {
 }
 
 class _FindDriverScreenState extends State<FindDriverScreen> {
+  final AuthService _authService = AuthService(
+    baseUrl: 'http://26.223.171.250:80',
+  );
+
+  User? _currentUser;
+
   final List<_NearbyMatch> _matches = const [
     _NearbyMatch(
+      userId: '2',
+      rideId: 'ride-001',
       name: 'Lorem',
       distanceKm: 5.0,
       pickup: 'Bellville',
@@ -18,6 +30,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       time: '08:00',
     ),
     _NearbyMatch(
+      userId: '3',
+      rideId: 'ride-002',
       name: 'Ipsum',
       distanceKm: 2.3,
       pickup: 'Durbanville',
@@ -25,6 +39,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       time: '08:30',
     ),
     _NearbyMatch(
+      userId: '4',
+      rideId: 'ride-003',
       name: 'Dolor',
       distanceKm: 8.1,
       pickup: 'Goodwood',
@@ -34,13 +50,60 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    try {
+      final user = await _authService.getUser();
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentUser = user;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to load your user information.')),
+      );
+    }
+  }
+
+  void _openMessageScreen(_NearbyMatch match) {
+    if (_currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please wait while your account is loaded.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MessageScreen(
+          rideId: match.rideId,
+          currentUserId: _currentUser!.userId.toString(),
+          otherUserId: match.userId,
+          otherUserName: match.name,
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: Stack(
         children: [
-          // Map layer
+          // Map
           _buildMap(),
 
           // Back button
@@ -51,7 +114,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
             ),
           ),
 
-          // Draggable bottom sheet
+          // Bottom sheet
           DraggableScrollableSheet(
             initialChildSize: 0.32,
             minChildSize: 0.20,
@@ -67,7 +130,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 10,
                       offset: const Offset(0, -3),
                     ),
@@ -153,7 +216,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
           width: 45,
           height: 5,
           decoration: BoxDecoration(
-            color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(10),
           ),
         ),
@@ -171,6 +234,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         padding: const EdgeInsets.all(15),
         child: Column(
           children: [
+            // Driver information
             Row(
               children: [
                 const CircleAvatar(radius: 25, child: Icon(Icons.person)),
@@ -191,12 +255,46 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
                       const SizedBox(height: 4),
 
-                      Text(
-                        '${match.pickup} → ${match.destination}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              match.pickup,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.flag_outlined,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              match.destination,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 3),
@@ -212,26 +310,38 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   ),
                 ),
 
-                Text(
-                  match.time,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
+                Column(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 18,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      match.time,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
 
             const SizedBox(height: 12),
 
+            // Message driver button
             SizedBox(
               width: double.infinity,
               height: 42,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () {
-                  // Ride request functionality will be added later
+                  _openMessageScreen(match);
                 },
-                child: const Text('View Driver'),
+                icon: const Icon(Icons.chat_outlined),
+                label: const Text('Message Driver'),
               ),
             ),
           ],
@@ -242,6 +352,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 }
 
 class _NearbyMatch {
+  final String userId;
+  final String rideId;
   final String name;
   final double distanceKm;
   final String pickup;
@@ -249,6 +361,8 @@ class _NearbyMatch {
   final String time;
 
   const _NearbyMatch({
+    required this.userId,
+    required this.rideId,
     required this.name,
     required this.distanceKm,
     required this.pickup,
