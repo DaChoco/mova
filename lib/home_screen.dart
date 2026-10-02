@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -261,9 +260,10 @@ class HomeScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const MessageScreen(
-                                conversationId: 'test-conversation-id',
-                                currentUserId: 'test-user-id',
+                              builder: (context) => MessageScreen(
+                                rideId: '152',
+                                currentUserId: user.userId.toString(),
+                                otherUserId: '27',
                                 otherUserName: 'John Doe',
                               ),
                             ),
