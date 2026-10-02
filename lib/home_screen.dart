@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'profile_screen.dart';
 import 'main.dart';
-import 'message_screen.dart';
 import 'find_driver_screen.dart';
 import 'find_passenger.dart';
 import 'models/auth.dart';
@@ -18,6 +17,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       drawer: Drawer(
         child: SafeArea(
@@ -220,119 +221,166 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            const Text(
-              'Recent Messages',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            // Messages
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Messages screen coming soon'),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
+                    child: Row(
+                      children: [
+                        // Message icon
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.chat_bubble_outline,
+                            color: colorScheme.primary,
+                            size: 24,
+                          ),
+                        ),
+
+                        const SizedBox(width: 14),
+
+                        // Message text
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Messages',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Your ride conversations',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Arrow
+                        Icon(Icons.arrow_forward_ios_rounded, size: 17),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
-            // Recent Messages
-            Expanded(
-              child: ListView(
-                children: [
-                  // Message 1
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline
-                            .withValues(alpha: 0.3),
-                      ),
-                      borderRadius: BorderRadius.circular(15),
+            // Upcoming Ride information
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section title
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 9),
+                        const Text(
+                          'Upcoming Ride',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: const Text(
-                          'John Doe',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: const Text(
-                          'Hey, are you still looking for a ride?',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => MessageScreen(
-                                rideId: '152',
-                                currentUserId: user.userId.toString(),
-                                otherUserId: '27',
-                                otherUserName: 'John Doe',
+
+                    const SizedBox(height: 18),
+
+                    // Empty ride state
+                    Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.10,
                               ),
+                              shape: BoxShape.circle,
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+                            child: Icon(
+                              Icons.directions_car_outlined,
+                              color: colorScheme.primary,
+                              size: 26,
+                            ),
+                          ),
 
-                  // Message 2
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline
-                            .withValues(alpha: 0.3),
-                      ),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: const Text(
-                          'Jane Smith',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: const Text('Thanks! I will let you know.'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          print('Jane Smith message pressed');
-                        },
-                      ),
-                    ),
-                  ),
+                          const SizedBox(height: 10),
 
-                  // Message 3
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline
-                            .withValues(alpha: 0.3),
-                      ),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: const Text(
-                          'John Doe',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: const Text('See you tomorrow!'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          print('John Doe message pressed');
-                        },
+                          const Text(
+                            'No upcoming rides',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+
+                          const SizedBox(height: 3),
+
+                          Text(
+                            'Your next ride will appear here',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
