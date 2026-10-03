@@ -46,6 +46,102 @@ namespace Mova.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Mova.Api.Models.Ride", b =>
+                {
+                    b.Property<int>("RideId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AvailableSeats")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DestinationAddress")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("DestinationLatitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("DestinationLongitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("DriverId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("EstimatedFare")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("PickupAddress")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("PickupLatitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("PickupLongitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ScheduledFor")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RideId");
+
+                    b.HasIndex("DriverId");
+
+                    b.ToTable("Rides");
+                });
+
+            modelBuilder.Entity("Mova.Api.Models.RideRequest", b =>
+                {
+                    b.Property<int>("RideRequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PassengerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double?>("Rating")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RideId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RideRequestId");
+
+                    b.HasIndex("PassengerId");
+
+                    b.HasIndex("RideId", "PassengerId")
+                        .IsUnique();
+
+                    b.ToTable("RideRequests");
+                });
+
             modelBuilder.Entity("Mova.Api.Models.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -58,6 +154,9 @@ namespace Mova.Api.Migrations
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDriver")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -88,6 +187,36 @@ namespace Mova.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Mova.Api.Models.Ride", b =>
+                {
+                    b.HasOne("Mova.Api.Models.User", "Driver")
+                        .WithMany()
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Driver");
+                });
+
+            modelBuilder.Entity("Mova.Api.Models.RideRequest", b =>
+                {
+                    b.HasOne("Mova.Api.Models.User", "Passenger")
+                        .WithMany()
+                        .HasForeignKey("PassengerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Mova.Api.Models.Ride", "Ride")
+                        .WithMany()
+                        .HasForeignKey("RideId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Passenger");
+
+                    b.Navigation("Ride");
                 });
 #pragma warning restore 612, 618
         }

@@ -37,6 +37,7 @@ public class UserController : ControllerBase
             studentNumber = user.StudentNumber,
             firstName = user.FirstName,
             surname = user.Surname,
+            isDriver = user.IsDriver,
             carID = user.CarId,
             profileIcon = user.ProfileIcon != null
                 ? $"{Request.Scheme}://{Request.Host}/profilepicture/{user.ProfileIcon}"
@@ -44,6 +45,31 @@ public class UserController : ControllerBase
         }
     });
     }
+
+    [HttpPost("update/{id}")]
+    public async Task<IActionResult> Update(int id, UpdateUserRequest req)
+{
+    var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")!);
+
+    if (id != currentUserId)
+        return Forbid(); // trying to update someone else's account
+
+    var user = await _db.Users.FindAsync(id);
+
+    if (user is null)
+        return NotFound(new { success = false, message = "User account could not be found." });
+
+    user.IsDriver = req.IsDriver;
+
+    await _db.SaveChangesAsync();
+
+    return Ok(new
+    {
+        success = true,
+        message = "User updated successfully."
+    });
+}
 
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)

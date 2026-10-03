@@ -9,4 +9,5 @@ public class User
     public string PasswordHash { get; set; } = "";
     public string? ProfileIcon { get; set; }
     public int? CarId { get; set; }
+    public bool IsDriver { get; set; } = false;
 }

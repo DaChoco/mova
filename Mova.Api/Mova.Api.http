@@ -1,5 +1,7 @@
 @Mova_HostAddress = http://26.223.171.250
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkwOTUyNzU3LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.E3AV9PmprmkXTlrZipeGeYgIevnnQD5NDRMCiZsvPjc
+
+@driverToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwic3R1ZGVudE51bWJlciI6IkVEVVY3NjU0MzIxIiwiZXhwIjoxNzkxMDM2Njc3LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.-3THkm4Z_SKAU-dzw5CFf8H6Fex1uOQlTPiLs4imT7I
 ### Refresh
 POST {{Mova_HostAddress}}/api/auth/refresh
 Content-Type: application/json
@@ -17,6 +19,17 @@ Content-Type: application/json
   "studentSurname": "Smith",
   "studentNumber": "EDUV1234567",
   "password": "Test1234!"
+}
+
+### Register Yaesh
+POST {{Mova_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "studentName": "Yaeshveer",
+  "studentSurname": "Naidoo",
+  "studentNumber": "EDUV4849939",
+  "password": "1234567!"
 }
 
 
@@ -144,3 +157,35 @@ Content-Type: image/jpeg
 
 < ./test.jpg
 ------Boundary123--
+
+### Driver creates a ride
+POST {{Mova_HostAddress}}/api/rides
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{
+  "pickupLatitude": -33.8765,
+  "pickupLongitude": 18.6302,
+  "pickupAddress": "Bellville Campus",
+  "destinationLatitude": -33.9249,
+  "destinationLongitude": 18.4241,
+  "destinationAddress": "Cape Town CBD",
+  "availableSeats": 3
+}
+
+### Passenger requests to join ride 1
+POST {{Mova_HostAddress}}/api/rides/1/request
+Authorization: Bearer {{{{token}}}}
+
+### Driver views requests
+GET {{Mova_HostAddress}}/api/rides/1/requests
+Authorization: Bearer {{driverToken}}
+
+### Driver accepts that passenger
+POST {{Mova_HostAddress}}/api/rides/1/accept
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{
+  "passengerId": 2
+}

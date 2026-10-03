@@ -169,12 +169,13 @@ public class AuthController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 // Converts a User entity to a DTO for API responses.
-    private static object ToDto(User u) => new
-    {
-        userId = u.UserId,
-        studentNumber = u.StudentNumber,
-        firstName = u.FirstName,
-        surname = u.Surname,
-        carID = u.CarId
-    };
+   private static object ToDto(User u) => new
+{
+    userId = u.UserId,
+    studentNumber = u.StudentNumber,
+    firstName = u.FirstName,
+    surname = u.Surname,
+    carID = u.CarId,
+    isDriver = u.IsDriver
+};
 }
