@@ -10,11 +10,50 @@ import 'chat_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
+import 'create_ride.dart';
+import 'my_rides.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final User user;
 
   const HomeScreen({super.key, required this.user});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late User _user;
+
+  final AuthService _authService = AuthService(
+    baseUrl: 'http://26.223.171.250:80',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+
+    _user = widget.user;
+  }
+
+  // Get the latest user information from the backend.
+  Future<void> _refreshUser() async {
+    try {
+      final updatedUser = await _authService.getUser();
+
+      if (!mounted) return;
+
+      setState(() {
+        _user = updatedUser;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +88,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 12),
 
                     Text(
-                      '${user.firstName} ${user.surname}',
+                      '${_user.firstName} ${_user.surname}',
                       style: const TextStyle(
                         fontSize: 21,
                         fontWeight: FontWeight.bold,
@@ -59,7 +98,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 4),
 
                     Text(
-                      user.studentNumber,
+                      _user.studentNumber,
                       style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                   ],
@@ -78,18 +117,36 @@ class HomeScreen extends StatelessWidget {
 
                     if (!context.mounted) return;
 
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ProfileScreen(user: user),
+                        builder: (context) => ProfileScreen(user: _user),
                       ),
                     );
+
+                    // ProfileScreen may have changed the user's role.
+                    // Get the latest user data when we return.
+                    await _refreshUser();
                   },
                   child: const ListTile(
                     leading: Icon(Icons.edit),
                     title: Text('Edit Profile', style: TextStyle(fontSize: 16)),
                   ),
                 ),
+              ),
+
+              // My Rides
+              ListTile(
+                leading: const Icon(Icons.directions_car),
+                title: const Text('My Rides', style: TextStyle(fontSize: 16)),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MyRidesScreen(),
+                    ),
+                  );
+                },
               ),
 
               // Dark Mode
@@ -115,11 +172,7 @@ class HomeScreen extends StatelessWidget {
                 leading: const Icon(Icons.logout),
                 title: const Text('Logout', style: TextStyle(fontSize: 16)),
                 onTap: () async {
-                  final authService = AuthService(
-                    baseUrl: 'http://26.223.171.250:80',
-                  );
-
-                  await authService.logout();
+                  await _authService.logout();
 
                   if (!context.mounted) return;
 
@@ -138,7 +191,7 @@ class HomeScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Carpool App',
+                  'Mova',
                   style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                 ),
               ),
@@ -177,7 +230,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 25),
 
             // Driver buttons
-            if (user.isDriver) ...[
+            if (_user.isDriver) ...[
               // Find a Driver
               SizedBox(
                 width: double.infinity,
@@ -230,7 +283,12 @@ class HomeScreen extends StatelessWidget {
                 height: 65,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Create Ride screen will be added here later.
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CreateRideScreen(),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.add_road),
                   label: const Text(
@@ -283,7 +341,7 @@ class HomeScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                            ChatsScreen(currentUserId: user.userId.toString()),
+                            ChatsScreen(currentUserId: _user.userId.toString()),
                       ),
                     );
                   },
@@ -336,7 +394,7 @@ class HomeScreen extends StatelessWidget {
                         ),
 
                         // Arrow
-                        Icon(Icons.arrow_forward_ios_rounded, size: 17),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 17),
                       ],
                     ),
                   ),
