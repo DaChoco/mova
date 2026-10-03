@@ -275,4 +275,40 @@ class AuthService {
           'Password change failed. Server returned ${response.statusCode}.',
     );
   }
+
+  Future<void> updateDriverStatus({
+    required int userId,
+    required bool isDriver,
+  }) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/user/update/$userId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'isDriver': isDriver}),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data['success'] == true) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      data['message'] ??
+          'Failed to update account role. '
+              'Server returned ${response.statusCode}.',
+    );
+  }
 }

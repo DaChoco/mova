@@ -87,6 +87,7 @@ class User {
   final String studentNumber;
   final String firstName;
   final String surname;
+  final bool isDriver;
   final int? carID;
   final String? profileIcon;
 
@@ -95,6 +96,7 @@ class User {
     required this.studentNumber,
     required this.firstName,
     required this.surname,
+    required this.isDriver,
     this.carID,
     this.profileIcon,
   });
@@ -105,6 +107,7 @@ class User {
       studentNumber: json['studentNumber'],
       firstName: json['firstName'],
       surname: json['surname'],
+      isDriver: json['isDriver'] ?? false,
       carID: json['carID'],
       profileIcon: json['profileIcon'],
     );

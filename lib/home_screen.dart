@@ -176,49 +176,91 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            // Find a Driver
-            SizedBox(
-              width: double.infinity,
-              height: 65,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const FindDriverScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.directions_car),
-                label: const Text(
-                  'Find a Driver',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            // Driver buttons
+            if (user.isDriver) ...[
+              // Find a Driver
+              SizedBox(
+                width: double.infinity,
+                height: 65,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FindDriverScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.directions_car),
+                  label: const Text(
+                    'Find a Driver',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 15),
+              const SizedBox(height: 15),
 
-            // Find a Passenger
-            SizedBox(
-              width: double.infinity,
-              height: 65,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const FindPassengerScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.person_search),
-                label: const Text(
-                  'Find a Passenger',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              // Find a Passenger
+              SizedBox(
+                width: double.infinity,
+                height: 65,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FindPassengerScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.person_search),
+                  label: const Text(
+                    'Find a Passenger',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-            ),
+
+              const SizedBox(height: 15),
+
+              // Create Rides
+              SizedBox(
+                width: double.infinity,
+                height: 65,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Create Ride screen will be added here later.
+                  },
+                  icon: const Icon(Icons.add_road),
+                  label: const Text(
+                    'Create Rides',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Passenger - Find Rides
+              SizedBox(
+                width: double.infinity,
+                height: 65,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FindDriverScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text(
+                    'Find Rides',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 30),
 

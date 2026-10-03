@@ -57,6 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
 
     _user = widget.user;
+    _selectedRole = _user.isDriver ? 'Driver' : 'Passenger';
 
     _loadProfilePicture();
   }
@@ -91,6 +92,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
       profileImageNotifier.value = response.bodyBytes;
     } catch (_) {
       // If the image cannot be loaded, keep the default person icon.
+    }
+  }
+
+  Future<void> _saveAccountRole() async {
+    final carRegistration = _carRegistrationController.text.trim();
+    final carModel = _carModelController.text.trim();
+
+    final bool isDriver = carRegistration.isNotEmpty && carModel.isNotEmpty;
+
+    try {
+      await _authService.updateDriverStatus(
+        userId: _user.userId,
+        isDriver: isDriver,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _user = User(
+          userId: _user.userId,
+          studentNumber: _user.studentNumber,
+          firstName: _user.firstName,
+          surname: _user.surname,
+          isDriver: isDriver,
+          carID: _user.carID,
+          profileIcon: _user.profileIcon,
+        );
+
+        _selectedRole = isDriver ? 'Driver' : 'Passenger';
+      });
+
+      _showMessage(
+        isDriver ? 'Account updated to Driver' : 'Account updated to Passenger',
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -130,6 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         firstName: _user.firstName,
         surname: _user.surname,
         carID: _user.carID,
+        isDriver: _user.isDriver,
         profileIcon: imageUrl,
       );
 
@@ -525,8 +565,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ],
-
             const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveAccountRole,
+                child: const Text('Save'),
+              ),
+            ),
           ],
         ),
       ),
