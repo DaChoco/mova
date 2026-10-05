@@ -1,36 +1,73 @@
-using System.Threading.Tasks;
+namespace Mova.Api.Helpers
+using System.IO;
 using System;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+
 
 public class SupabaseStorageService
 {
-    public async Task<string> UploadProfilePictureAsync(
-        String bucketName,
-        String userId,
-        String fileName)
+    private readonly IConfiguration _configuration;
+    private readonly HttpClient _httpClient;
+
+    public SupabaseStorageService(
+        IConfiguration configuration,
+        HttpClient httpClient)
     {
-        var supabaseUrl = "https://zeedqugdftxrbscmhgmq.supabase.co";
-        var supabaseKey = "YOUR_SUPABASE_KEY";
+        _configuration = configuration;
+        _httpClient = httpClient;
+    }
 
-        var url = $"{supabaseUrl}/storage/v1/object/{bucketName}/{userId}/{fileName}";
+    public async Task<string> UploadProfilePictureAsync(
+        string bucketName,
+        string userId,
+        string fileName,
+        Stream fileStream,
+        string contentType)
+    {
+        var supabaseUrl = _configuration["Supabase:Url"];
+        var serviceKey = _configuration["Supabase:ServiceKey"];
 
-        using var client = new HttpClient();
+        if (string.IsNullOrEmpty(supabaseUrl))
+            throw new InvalidOperationException("Supabase URL is not configured.");
 
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", supabaseKey);
+        if (string.IsNullOrEmpty(serviceKey))
+            throw new InvalidOperationException("Supabase service key is not configured.");
 
-        client.DefaultRequestHeaders.Add("apikey", supabaseKey);
+        var filePath = $"{userId}/{fileName}";
 
-        await using var fileStream = File.OpenRead(filePath);
+        var url =
+            $"{supabaseUrl}/storage/v1/object/{bucketName}/{filePath}";
 
-        using var content = new StreamContent(fileStream);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            url);
+
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", serviceKey);
+
+        request.Headers.Add("apikey", serviceKey);
+
+        request.Headers.Add("x-upsert", "true");
+
+        var content = new StreamContent(fileStream);
 
         content.Headers.ContentType =
-            new MediaTypeHeaderValue("image/jpeg");
+            new MediaTypeHeaderValue(contentType);
 
-        var response = await client.PostAsync(url, content);
+        request.Content = content;
 
-        response.EnsureSuccessStatusCode();
+        var response = await _httpClient.SendAsync(request);
 
-        return $"{supabaseUrl}/storage/v1/object/public/{bucketName}/{fileName}";
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new Exception(
+                $"Supabase upload failed: {response.StatusCode} - {responseBody}");
+        }
+
+        // Public URL
+        return $"{supabaseUrl}/storage/v1/object/public/{bucketName}/{filePath}";
     }
 }

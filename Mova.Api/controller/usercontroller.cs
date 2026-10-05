@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Mova.Api.Data;
 using Mova.Api.Dtos;
+using Mova.Api.Helpers;
+
 
 namespace Mova.Api.Controllers;
 
@@ -14,11 +16,16 @@ namespace Mova.Api.Controllers;
 [Authorize] // All endpoints in this controller require the user to be authenticated via JWT.
 public class UserController : ControllerBase
 {
-    private readonly AppDbContext _db;
 
-    public UserController(AppDbContext db)
+    private readonly AppDbContext _db;
+    private readonly SupabaseStorageService _storage;
+
+
+    public UserController(AppDbContext db, SupabaseStorageService storage)
     {
         _db = db;
+        _storage = storage;
+
     }
     //retrieves user information based on the provided user ID.
    [HttpGet("{id}")]
@@ -53,7 +60,7 @@ public class UserController : ControllerBase
         ?? User.FindFirstValue("sub")!);
 
     if (id != currentUserId)
-        return Forbid(); // trying to update someone else's account
+        return Forbid();
 
     var user = await _db.Users.FindAsync(id);
 
@@ -100,47 +107,89 @@ public class UserController : ControllerBase
         return Ok(new { success = true, message = "Password changed successfully." });
     }
 
-    // Uploads a new profile picture for the logged-in user. Validates file type and size, deletes any existing profile picture, and saves the new one.
     [HttpPost("profile-picture")]
     public async Task<IActionResult> UploadProfilePicture(IFormFile file)
     {
-    var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+        var userId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!
+        );
 
-    var user = await _db.Users.FindAsync(userId);
-    if (user is null)
-        return NotFound(new { success = false });
+        var user = await _db.Users.FindAsync(userId);
 
-    if (file is null || file.Length == 0)
-        return BadRequest(new { success = false, message = "No file uploaded." });
+        if (user is null)
+            return NotFound(new { success = false });
 
-    var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
-    if (!allowedTypes.Contains(file.ContentType))
-        return BadRequest(new { success = false, message = "Only JPEG, PNG or WEBP images are allowed." });
+        if (file is null || file.Length == 0)
+            return BadRequest(new
+            {
+                success = false,
+                message = "No file uploaded."
+            });
 
-    const long maxSizeBytes = 5 * 1024 * 1024; // 5 MB
-    if (file.Length > maxSizeBytes)
-        return BadRequest(new { success = false, message = "File must be under 5MB." });
+        var allowedTypes = new[]
+        {
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    };
 
-    if (!string.IsNullOrEmpty(user.ProfileIcon))
-    {
-        var oldPath = Path.Combine("profilepicture", user.ProfileIcon);
-        if (System.IO.File.Exists(oldPath))
-            System.IO.File.Delete(oldPath);
+        if (!allowedTypes.Contains(file.ContentType))
+            return BadRequest(new
+            {
+                success = false,
+                message = "Only JPEG, PNG or WEBP images are allowed."
+            });
+
+        const long maxSizeBytes = 5 * 1024 * 1024;
+
+        if (file.Length > maxSizeBytes)
+            return BadRequest(new
+            {
+                success = false,
+                message = "File must be under 5MB."
+            });
+
+        // FileName
+        var extension = Path.GetExtension(file.FileName);
+
+        var fileName =
+            $"{Guid.NewGuid()}{extension}";
+
+        // Upload directly to Supabase
+        string profilePictureUrl;
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+
+            profilePictureUrl =
+                await _storage.UploadProfilePictureAsync(
+                    "profile-pictures",
+                    userId.ToString(),
+                    fileName,
+                    stream,
+                    file.ContentType);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                success = false,
+                message = "Failed to upload profile picture."
+            });
+        }
+
+        // Save the path/filename to db
+        user.ProfileIcon = $"{userId}/{fileName}";
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            profileIcon = user.ProfileIcon,
+            url = profilePictureUrl
+        });
     }
-    // Generate a unique filename for the new profile picture and save it to the server.
-    var extension = Path.GetExtension(file.FileName);
-    var fileName = $"{userId}_{Guid.NewGuid()}{extension}";
-    var savePath = Path.Combine("profilepicture", fileName);
-
-    using (var stream = new FileStream(savePath, FileMode.Create))
-    {
-        await file.CopyToAsync(stream);
-    }
-
-    user.ProfileIcon = fileName;
-    await _db.SaveChangesAsync();
-
-    return Ok(new { success = true, profileIcon = fileName, url = $"/profilepicture/{fileName}" });
-}
 }
