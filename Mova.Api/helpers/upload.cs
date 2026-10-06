@@ -3,12 +3,14 @@ using System.IO;
 using System;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-
+using DotNetEnv;
 
 public class SupabaseStorageService
 {
     private readonly IConfiguration _configuration;
     private readonly HttpClient _httpClient;
+    Env.Load("../.env");
+    var builder = WebApplication.CreateBuilder(args);
 
     public SupabaseStorageService(
         IConfiguration configuration,
@@ -25,8 +27,8 @@ public class SupabaseStorageService
         Stream fileStream,
         string contentType)
     {
-        var supabaseUrl = _configuration["Supabase:Url"];
-        var serviceKey = _configuration["Supabase:ServiceKey"];
+        var supabaseUrl = builder.Configuration["SUPABASE_URL"]; 
+        var serviceKey = builder.Configuration["SUPABASE_SERVICE_KEY"];
 
         if (string.IsNullOrEmpty(supabaseUrl))
             throw new InvalidOperationException("Supabase URL is not configured.");
