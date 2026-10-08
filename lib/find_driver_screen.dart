@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import 'message_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
 
@@ -19,81 +18,120 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
   User? _currentUser;
 
-  final List<_NearbyMatch> _matches = const [
-    _NearbyMatch(
-      userId: '2',
-      rideId: 'ride-001',
-      name: 'Lorem',
-      distanceKm: 5.0,
-      pickup: 'Bellville',
-      destination: 'Eduvos',
-      time: '08:00',
-    ),
-    _NearbyMatch(
-      userId: '3',
-      rideId: 'ride-002',
-      name: 'Ipsum',
-      distanceKm: 2.3,
-      pickup: 'Durbanville',
-      destination: 'Eduvos',
-      time: '08:30',
-    ),
-    _NearbyMatch(
-      userId: '4',
-      rideId: 'ride-003',
-      name: 'Dolor',
-      distanceKm: 8.1,
-      pickup: 'Goodwood',
-      destination: 'Eduvos',
-      time: '09:00',
-    ),
-  ];
+  List<Map<String, dynamic>> _rides = [];
+
+  bool _isLoading = true;
+
+  int? _requestingRideId;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
+    _loadAvailableRides();
   }
 
-  Future<void> _loadCurrentUser() async {
+  Future<void> _loadAvailableRides() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final user = await _authService.getUser();
+
+      final rides = await _authService.getAvailableRides();
 
       if (!mounted) return;
 
       setState(() {
         _currentUser = user;
+        _rides = rides;
+        _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
 
+      setState(() {
+        _isLoading = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to load your user information.')),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
   }
 
-  void _openMessageScreen(_NearbyMatch match) {
-    if (_currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please wait while your account is loaded.'),
-        ),
-      );
+  Future<void> _requestRide(Map<String, dynamic> ride) async {
+    final rideId = int.tryParse(ride['rideId'].toString());
+
+    if (rideId == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Invalid ride ID.')));
+
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MessageScreen(
-          rideId: match.rideId,
-          currentUserId: _currentUser!.userId.toString(),
-          otherUserId: match.userId,
-          otherUserName: match.name,
-        ),
-      ),
-    );
+    setState(() {
+      _requestingRideId = rideId;
+    });
+
+    try {
+      await _authService.requestRide(rideId);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ride request sent successfully.')),
+      );
+
+      await _loadAvailableRides();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _requestingRideId = null;
+        });
+      }
+    }
+  }
+
+  String _formatScheduledTime(dynamic scheduledFor) {
+    if (scheduledFor == null) {
+      return 'Unknown time';
+    }
+
+    try {
+      final date = DateTime.parse(scheduledFor.toString()).toLocal();
+
+      final day = date.day.toString().padLeft(2, '0');
+      final month = date.month.toString().padLeft(2, '0');
+      final year = date.year.toString();
+
+      final hour = date.hour.toString().padLeft(2, '0');
+      final minute = date.minute.toString().padLeft(2, '0');
+
+      return '$day/$month/$year at $hour:$minute';
+    } catch (_) {
+      return 'Unknown time';
+    }
+  }
+
+  String _formatFare(dynamic estimatedFare) {
+    if (estimatedFare == null) {
+      return 'Not available';
+    }
+
+    final fare = double.tryParse(estimatedFare.toString());
+
+    if (fare == null) {
+      return 'Not available';
+    }
+
+    return 'R${fare.toStringAsFixed(2)}';
   }
 
   @override
@@ -101,247 +139,409 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Map
-          _buildMap(),
-
-          // Back button
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: _buildBackButton(context),
-            ),
-          ),
-
-          // Bottom sheet
-          DraggableScrollableSheet(
-            initialChildSize: 0.32,
-            minChildSize: 0.20,
-            maxChildSize: 0.80,
-            snap: true,
-            snapSizes: const [0.20, 0.32, 0.80],
-            builder: (context, scrollController) {
-              return Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(25),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, -3),
-                    ),
-                  ],
-                ),
-                child: ListView(
-                  controller: scrollController,
-                  padding: EdgeInsets.zero,
-                  children: [
-                    // Drag handle
-                    _buildDragHandle(context),
-
-                    // Heading
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 5, 20, 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Nearby Drivers',
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.tune),
-                            onPressed: () {
-                              // Filters will be added later
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Driver cards
-                    ..._matches.map((match) => _buildMatchCard(context, match)),
-
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              );
-            },
+      appBar: AppBar(
+        title: const Text(
+          'Find a Driver',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: _isLoading ? null : _loadAvailableRides,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh rides',
           ),
         ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _rides.isEmpty
+          ? _buildEmptyState(colorScheme)
+          : _buildRideContent(colorScheme),
     );
   }
 
-  Widget _buildBackButton(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: colorScheme.surface,
-      shape: const CircleBorder(),
-      elevation: 3,
-      child: IconButton(
-        icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
-        onPressed: () {
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  Widget _buildMap() {
-    return MapLibreMap(
-      initialCameraPosition: const CameraPosition(
-        target: LatLng(-33.88, 18.63),
-        zoom: 11,
-      ),
-      styleString: 'https://tiles.openfreemap.org/styles/bright',
-    );
-  }
-
-  Widget _buildDragHandle(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 5),
-      child: Center(
-        child: Container(
-          width: 45,
-          height: 5,
-          decoration: BoxDecoration(
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(10),
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: MapLibreMap(
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(-33.88, 18.63),
+              zoom: 11,
+            ),
+            styleString: 'https://tiles.openfreemap.org/styles/bright',
           ),
         ),
-      ),
+
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(25, 30, 25, 35),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(25),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, -3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.directions_car_outlined,
+                  size: 60,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+
+                const SizedBox(height: 15),
+
+                const Text(
+                  'No Rides Available',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  'There are currently no available rides. '
+                  'Check again later.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 15,
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _loadAvailableRides,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Search Again'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildMatchCard(BuildContext context, _NearbyMatch match) {
+  Widget _buildRideContent(ColorScheme colorScheme) {
+    return Stack(
+      children: [
+        // -------------------------------------------------------------
+        // MAP
+        // -------------------------------------------------------------
+
+        Positioned.fill(
+          child: MapLibreMap(
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(-33.88, 18.63),
+              zoom: 11,
+            ),
+            styleString: 'https://tiles.openfreemap.org/styles/bright',
+          ),
+        ),
+
+        // -------------------------------------------------------------
+        // RIDE LIST
+        // -------------------------------------------------------------
+        DraggableScrollableSheet(
+          initialChildSize: 0.48,
+          minChildSize: 0.25,
+          maxChildSize: 0.85,
+          snap: true,
+          snapSizes: const [0.25, 0.48, 0.85],
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(25),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, -3),
+                  ),
+                ],
+              ),
+              child: ListView(
+                controller: scrollController,
+                padding: EdgeInsets.zero,
+                children: [
+                  // Drag handle
+                  Container(
+                    padding: const EdgeInsets.only(top: 10, bottom: 5),
+                    child: Center(
+                      child: Container(
+                        width: 45,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.4,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Heading
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Available Rides',
+                          style: TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_rides.length}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Ride cards
+                  ..._rides.map((ride) => _buildRideCard(context, ride)),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRideCard(BuildContext context, Map<String, dynamic> ride) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    final rideId = int.tryParse(ride['rideId'].toString());
+
+    final isRequesting = rideId != null && _requestingRideId == rideId;
+
+    final pickup = ride['pickupAddress']?.toString() ?? 'Unknown pickup';
+
+    final destination =
+        ride['destinationAddress']?.toString() ?? 'Unknown destination';
+
+    final seats = ride['availableSeats']?.toString() ?? 'Unknown';
+
+    final scheduled = _formatScheduledTime(ride['scheduledFor']);
+
+    final fare = _formatFare(ride['estimatedFare']);
 
     return Card(
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
       elevation: 1,
       child: Padding(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Driver information
+            // ---------------------------------------------------------
+            // RIDE HEADER
+            // ---------------------------------------------------------
+
             Row(
               children: [
-                const CircleAvatar(radius: 25, child: Icon(Icons.person)),
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.person,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
 
                 const SizedBox(width: 12),
 
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        match.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 16,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              match.pickup,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.flag_outlined,
-                            size: 16,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              match.destination,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        '${match.distanceKm.toStringAsFixed(1)} km away',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                const Expanded(
+                  child: Text(
+                    'Driver',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                 ),
 
                 Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 18,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(height: 3),
                     Text(
-                      match.time,
+                      fare,
                       style: TextStyle(
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
+                    ),
+                    const Text(
+                      'estimated fare',
+                      style: TextStyle(fontSize: 11),
                     ),
                   ],
                 ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Message driver button
+            // ---------------------------------------------------------
+            // PICKUP
+            // ---------------------------------------------------------
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 21,
+                  color: colorScheme.primary,
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pickup',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 2),
+
+                      Text(pickup, style: const TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // ---------------------------------------------------------
+            // DESTINATION
+            // ---------------------------------------------------------
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.school_outlined,
+                  size: 21,
+                  color: colorScheme.primary,
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Destination',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 2),
+
+                      Text(destination, style: const TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // ---------------------------------------------------------
+            // RIDE DETAILS
+            // ---------------------------------------------------------
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDetail(
+                    icon: Icons.access_time_outlined,
+                    text: scheduled,
+                    colorScheme: colorScheme,
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: _buildDetail(
+                    icon: Icons.people_outline,
+                    text: '$seats seats',
+                    colorScheme: colorScheme,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ---------------------------------------------------------
+            // REQUEST BUTTON
+            // ---------------------------------------------------------
             SizedBox(
               width: double.infinity,
-              height: 42,
+              height: 48,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  _openMessageScreen(match);
-                },
-                icon: const Icon(Icons.chat_outlined),
-                label: const Text('Message Driver'),
+                onPressed: isRequesting
+                    ? null
+                    : () {
+                        _requestRide(ride);
+                      },
+                icon: isRequesting
+                    ? const SizedBox(
+                        width: 19,
+                        height: 19,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.directions_car_outlined),
+                label: Text(isRequesting ? 'Requesting...' : 'Request Ride'),
               ),
             ),
           ],
@@ -349,24 +549,25 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       ),
     );
   }
-}
 
-class _NearbyMatch {
-  final String userId;
-  final String rideId;
-  final String name;
-  final double distanceKm;
-  final String pickup;
-  final String destination;
-  final String time;
+  Widget _buildDetail({
+    required IconData icon,
+    required String text,
+    required ColorScheme colorScheme,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
 
-  const _NearbyMatch({
-    required this.userId,
-    required this.rideId,
-    required this.name,
-    required this.distanceKm,
-    required this.pickup,
-    required this.destination,
-    required this.time,
-  });
+        const SizedBox(width: 6),
+
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
 }

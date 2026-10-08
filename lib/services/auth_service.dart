@@ -311,4 +311,319 @@ class AuthService {
               'Server returned ${response.statusCode}.',
     );
   }
+
+  Future<void> createRide({
+    required double pickupLatitude,
+    required double pickupLongitude,
+    required String pickupAddress,
+    required double destinationLatitude,
+    required double destinationLongitude,
+    required String destinationAddress,
+    required int availableSeats,
+    required DateTime scheduledFor,
+  }) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'pickupLatitude': pickupLatitude,
+        'pickupLongitude': pickupLongitude,
+        'pickupAddress': pickupAddress,
+        'destinationLatitude': destinationLatitude,
+        'destinationLongitude': destinationLongitude,
+        'destinationAddress': destinationAddress,
+        'availableSeats': availableSeats,
+        'scheduledFor': scheduledFor.toUtc().toIso8601String(),
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    if (response.statusCode == 403) {
+      throw Exception('Only registered drivers can create rides.');
+    }
+
+    String message =
+        'Failed to create ride. Server returned ${response.statusCode}.';
+
+    try {
+      final data = jsonDecode(response.body);
+
+      if (data['message'] != null) {
+        message = data['message'];
+      }
+    } catch (_) {
+      // Keep the default error message.
+    }
+
+    throw Exception(message);
+  }
+
+  Future<Map<String, dynamic>?> getActiveRide() async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rides/active'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return data['ride'] as Map<String, dynamic>?;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      'Failed to load active ride. Server returned ${response.statusCode}.',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getRideRequests(int rideId) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rides/$rideId/requests'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return List<Map<String, dynamic>>.from(data['requests'] ?? []);
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      'Failed to load ride requests. Server returned ${response.statusCode}.',
+    );
+  }
+
+  Future<void> acceptPassenger({
+    required int rideId,
+    required int passengerId,
+  }) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides/$rideId/accept'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'passengerId': passengerId}),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    if (response.statusCode == 403) {
+      throw Exception('You are not allowed to accept this request.');
+    }
+
+    String message =
+        'Failed to accept passenger. Server returned ${response.statusCode}.';
+
+    try {
+      final data = jsonDecode(response.body);
+
+      if (data['message'] != null) {
+        message = data['message'];
+      }
+    } catch (_) {
+      // Keep default message.
+    }
+
+    throw Exception(message);
+  }
+
+  Future<void> rejectPassenger({
+    required int rideId,
+    required int passengerId,
+  }) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides/$rideId/reject'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'passengerId': passengerId}),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    if (response.statusCode == 403) {
+      throw Exception('You are not allowed to reject this request.');
+    }
+
+    String message =
+        'Failed to reject passenger. Server returned ${response.statusCode}.';
+
+    try {
+      final data = jsonDecode(response.body);
+
+      if (data['message'] != null) {
+        message = data['message'];
+      }
+    } catch (_) {
+      // Keep default message.
+    }
+
+    throw Exception(message);
+  }
+
+  Future<void> cancelRide(int rideId) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides/$rideId/cancel'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    if (response.statusCode == 403) {
+      throw Exception('You are not allowed to cancel this ride.');
+    }
+
+    String message =
+        'Failed to cancel ride. Server returned ${response.statusCode}.';
+
+    try {
+      final data = jsonDecode(response.body);
+
+      if (data['message'] != null) {
+        message = data['message'];
+      }
+    } catch (_) {
+      // Keep default message.
+    }
+
+    throw Exception(message);
+  }
+
+  Future<List<Map<String, dynamic>>> getAvailableRides() async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rides/available'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return List<Map<String, dynamic>>.from(data['rides'] ?? []);
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      'Failed to load available rides. '
+      'Server returned ${response.statusCode}.',
+    );
+  }
+
+  Future<void> requestRide(int rideId) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides/$rideId/request'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    String message =
+        'Failed to request ride. '
+        'Server returned ${response.statusCode}.';
+
+    try {
+      final data = jsonDecode(response.body);
+
+      if (data['message'] != null) {
+        message = data['message'];
+      }
+    } catch (_) {
+      // Keep default message.
+    }
+
+    throw Exception(message);
+  }
 }
