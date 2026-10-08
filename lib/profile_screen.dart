@@ -9,9 +9,29 @@ import '../services/auth_service.dart';
 import 'login_screen.dart';
 
 // Shared profile image notifier.
-// HomeScreen can use this later as well.
+// HomeScreen listens to this for the drawer avatar.
 final ValueNotifier<Uint8List?> profileImageNotifier =
     ValueNotifier<Uint8List?>(null);
+
+// Downloads the profile picture from [url] and stores it in
+// [profileImageNotifier]. Safe to call from any screen.
+Future<void> loadProfileImage(String? url) async {
+  // No profile picture has been uploaded yet.
+  if (url == null || url.isEmpty) {
+    profileImageNotifier.value = null;
+    return;
+  }
+
+  try {
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      profileImageNotifier.value = response.bodyBytes;
+    }
+  } catch (_) {
+    // If the image cannot be loaded, keep whatever is currently shown.
+  }
+}
 
 class ProfileScreen extends StatefulWidget {
   final User user;
@@ -59,7 +79,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _user = widget.user;
     _selectedRole = _user.isDriver ? 'Driver' : 'Passenger';
 
-    _loadProfilePicture();
+    // HomeScreen normally loads the picture already. Only download it
+    // here if the notifier is still empty.
+    if (profileImageNotifier.value == null) {
+      loadProfileImage(_user.profileIcon);
+    }
   }
 
   @override
@@ -72,27 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _carModelController.dispose();
 
     super.dispose();
-  }
-
-  Future<void> _loadProfilePicture() async {
-    try {
-      // No profile picture has been uploaded yet.
-      if (_user.profileIcon == null || _user.profileIcon!.isEmpty) {
-        return;
-      }
-
-      final response = await http.get(Uri.parse(_user.profileIcon!));
-
-      if (response.statusCode != 200) {
-        return;
-      }
-
-      if (!mounted) return;
-
-      profileImageNotifier.value = response.bodyBytes;
-    } catch (_) {
-      // If the image cannot be loaded, keep the default person icon.
-    }
   }
 
   Future<void> _saveAccountRole() async {
@@ -252,6 +255,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _showMessage('Password changed successfully');
 
       await _authService.logout();
+
+      // Clear the shared image so the next login starts fresh.
+      profileImageNotifier.value = null;
 
       if (!mounted) return;
 
