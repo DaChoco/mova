@@ -1,3 +1,13 @@
 namespace Mova.Api.Dtos;
 
 public record SendMessageRequest(string Message);
+
+public class MessageDto
+{
+    public string MessageId { get; set; } = string.Empty;
+    public string SenderId { get; set; } = string.Empty;
+    public string SenderType { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string SentAt { get; set; } = string.Empty;
+    public bool IsRead { get; set; }
+}

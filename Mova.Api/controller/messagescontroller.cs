@@ -9,6 +9,28 @@ using Mova.Api.Models;
 namespace Mova.Api.Controllers;
 
 [ApiController]
+[Route("/api/rides/{rideId}/messages/{messageId}/read")]
+[Authorize]
+public class IsReadController : ControllerBase
+{
+    private readonly MongoDbContext _mongo;
+    public IsReadController(MongoDbContext mongo)
+    {
+        _mongo = mongo;
+    }
+    [HttpPost]
+    public async Task<IActionResult> MarkAsRead(string rideId, string messageId)
+    {
+        var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!);
+        var update = Builders<MessageDocument>.Update.Set(m => m.IsRead, true);
+        await _mongo.Messages.UpdateManyAsync(
+            m => m.RideId == rideId && m.Id == messageId && m.SenderId != currentUserId && !m.IsRead,
+            update
+        );
+        return Ok(new { success = true });
+    }
+}
 [Route("api/rides/{rideId}/messages")]
 [Authorize]
 public class MessagesController : ControllerBase
@@ -28,14 +50,14 @@ public class MessagesController : ControllerBase
             .SortBy(m => m.SentAt)
             .ToListAsync();
 
-        var result = messages.Select((m, index) => new
+        var result = messages.Select(m => new MessageDto
         {
-            messageId = m.Id,
-            senderId = m.SenderId,
-            senderType = m.SenderType,
-            message = m.Message,
-            sentAt = m.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            isRead = m.IsRead
+            MessageId = m.Id,
+            SenderId = m.SenderId,
+            SenderType = m.SenderType,
+            Message = m.Message,
+            SentAt = m.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            IsRead = m.IsRead
         });
 
         return Ok(new { success = true, messages = result });

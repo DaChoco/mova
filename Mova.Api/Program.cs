@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Mova.Api.Data;
+using Mova.Api.Helpers;
 using Microsoft.Extensions.FileProviders;
+using DotNetEnv;
 
+Env.Load("./.env");
 var builder = WebApplication.CreateBuilder(args);
+
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
 
@@ -66,7 +70,7 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
         Path.Combine(builder.Environment.ContentRootPath, "profilepicture")),
-    RequestPath = "/profilepicture"
+    RequestPath = "./profilepicture"
 });
 
 app.UseAuthentication();   // must come before UseAuthorization
