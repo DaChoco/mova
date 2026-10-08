@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Mova.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+547e9ecca70cc61b28b9add090dd43e0937f9536")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ca748ea509aaa823b4f12e20d99f61fa6e56e3d9")]
 [assembly: System.Reflection.AssemblyProductAttribute("Mova.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Mova.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
