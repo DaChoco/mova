@@ -34,6 +34,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     _user = widget.user;
+
+    // Load the profile picture as soon as the home screen starts,
+    // so the drawer shows it without opening the profile screen first.
+    if (_user.profileIcon != null && _user.profileIcon!.isNotEmpty) {
+      loadProfileImage(_user.profileIcon);
+    } else {
+      // The login response may not include profileIcon, so fetch the
+      // full user from the backend to get it.
+      _refreshUser();
+    }
   }
 
   // Get the latest user information from the backend.
@@ -46,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _user = updatedUser;
       });
+
+      loadProfileImage(updatedUser.profileIcon);
     } catch (e) {
       if (!mounted) return;
 
@@ -173,6 +185,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: const Text('Logout', style: TextStyle(fontSize: 16)),
                 onTap: () async {
                   await _authService.logout();
+
+                  // Clear the shared image so the next user to log in
+                  // doesn't briefly see this user's picture.
+                  profileImageNotifier.value = null;
 
                   if (!context.mounted) return;
 
