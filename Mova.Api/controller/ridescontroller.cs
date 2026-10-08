@@ -383,8 +383,15 @@ public class RidesController : ControllerBase
     {
         rideId = r.RideId,
         status = r.Status,
+
         pickupAddress = r.PickupAddress,
+        pickupLatitude = r.PickupLatitude,
+        pickupLongitude = r.PickupLongitude,
+
         destinationAddress = r.DestinationAddress,
+        destinationLatitude = r.DestinationLatitude,
+        destinationLongitude = r.DestinationLongitude,
+
         availableSeats = r.AvailableSeats,
         scheduledFor = r.ScheduledFor.ToString("yyyy-MM-ddTHH:mm:ssZ"),
         estimatedFare = r.EstimatedFare,
