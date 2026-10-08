@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
-
 import 'dart:convert';
 
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 import 'models/auth.dart';
 import 'services/auth_service.dart';
@@ -28,6 +27,9 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
   int? _requestingRideId;
 
+  // The ride currently selected on the map.
+  int? _selectedRideId;
+
   MapLibreMapController? _mapController;
 
   bool _mapStyleLoaded = false;
@@ -47,6 +49,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       final user = await _authService.getUser();
 
       final rides = await _authService.getAvailableRides();
+
       debugPrint('AVAILABLE RIDES: $rides');
 
       if (!mounted) return;
@@ -56,6 +59,9 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         _rides = rides;
         _isLoading = false;
       });
+
+      // Clear the previous selection when the rides are refreshed.
+      _selectedRideId = null;
 
       await _addRideMarkers();
     } catch (e) {
@@ -71,72 +77,93 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
+  /// Clears the existing map route/markers and displays
+  /// the route belonging to the currently selected ride.
   Future<void> _addRideMarkers() async {
     if (_mapController == null || !_mapStyleLoaded) {
       return;
     }
 
     try {
+      // Remove the previous driver's route and markers.
       await _mapController!.clearCircles();
       await _mapController!.clearLines();
 
+      // If no ride is selected, keep the map clear.
+      if (_selectedRideId == null) {
+        return;
+      }
+
+      Map<String, dynamic>? selectedRide;
+
       for (final ride in _rides) {
-        final pickupLatitude = double.tryParse(
-          ride['pickupLatitude']?.toString() ?? '',
-        );
+        final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
-        final pickupLongitude = double.tryParse(
-          ride['pickupLongitude']?.toString() ?? '',
-        );
-
-        final destinationLatitude = double.tryParse(
-          ride['destinationLatitude']?.toString() ?? '',
-        );
-
-        final destinationLongitude = double.tryParse(
-          ride['destinationLongitude']?.toString() ?? '',
-        );
-
-        // BLUE DOT = Pickup / Start
-        if (pickupLatitude != null && pickupLongitude != null) {
-          await _mapController!.addCircle(
-            CircleOptions(
-              geometry: LatLng(pickupLatitude, pickupLongitude),
-              circleRadius: 9,
-              circleColor: '#0000FF',
-              circleOpacity: 1.0,
-              circleStrokeWidth: 3,
-              circleStrokeColor: '#FFFFFF',
-            ),
-          );
+        if (rideId == _selectedRideId) {
+          selectedRide = ride;
+          break;
         }
+      }
 
-        // RED DOT = Destination / Eduvos
-        if (destinationLatitude != null && destinationLongitude != null) {
-          await _mapController!.addCircle(
-            CircleOptions(
-              geometry: LatLng(destinationLatitude, destinationLongitude),
-              circleRadius: 9,
-              circleColor: '#FF0000',
-              circleOpacity: 1.0,
-              circleStrokeWidth: 3,
-              circleStrokeColor: '#FFFFFF',
-            ),
-          );
-        }
+      if (selectedRide == null) {
+        return;
+      }
 
-        // DRAW THE ACTUAL ROAD ROUTE
-        if (pickupLatitude != null &&
-            pickupLongitude != null &&
-            destinationLatitude != null &&
-            destinationLongitude != null) {
-          await _drawRoute(
-            pickupLatitude: pickupLatitude,
-            pickupLongitude: pickupLongitude,
-            destinationLatitude: destinationLatitude,
-            destinationLongitude: destinationLongitude,
-          );
-        }
+      final pickupLatitude = double.tryParse(
+        selectedRide['pickupLatitude']?.toString() ?? '',
+      );
+
+      final pickupLongitude = double.tryParse(
+        selectedRide['pickupLongitude']?.toString() ?? '',
+      );
+
+      final destinationLatitude = double.tryParse(
+        selectedRide['destinationLatitude']?.toString() ?? '',
+      );
+
+      final destinationLongitude = double.tryParse(
+        selectedRide['destinationLongitude']?.toString() ?? '',
+      );
+
+      // BLUE DOT = pickup location
+      if (pickupLatitude != null && pickupLongitude != null) {
+        await _mapController!.addCircle(
+          CircleOptions(
+            geometry: LatLng(pickupLatitude, pickupLongitude),
+            circleRadius: 9,
+            circleColor: '#0000FF',
+            circleOpacity: 1.0,
+            circleStrokeWidth: 3,
+            circleStrokeColor: '#FFFFFF',
+          ),
+        );
+      }
+
+      // RED DOT = destination
+      if (destinationLatitude != null && destinationLongitude != null) {
+        await _mapController!.addCircle(
+          CircleOptions(
+            geometry: LatLng(destinationLatitude, destinationLongitude),
+            circleRadius: 9,
+            circleColor: '#FF0000',
+            circleOpacity: 1.0,
+            circleStrokeWidth: 3,
+            circleStrokeColor: '#FFFFFF',
+          ),
+        );
+      }
+
+      // Draw the selected ride's OSRM route.
+      if (pickupLatitude != null &&
+          pickupLongitude != null &&
+          destinationLatitude != null &&
+          destinationLongitude != null) {
+        await _drawRoute(
+          pickupLatitude: pickupLatitude,
+          pickupLongitude: pickupLongitude,
+          destinationLatitude: destinationLatitude,
+          destinationLongitude: destinationLongitude,
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -147,6 +174,46 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
+  /// Selects a ride and displays its route on the map.
+  ///
+  /// Selecting another ride automatically clears the
+  /// previous route and displays the new one.
+  Future<void> _selectRide(Map<String, dynamic> ride) async {
+    final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
+
+    if (rideId == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedRideId = rideId;
+    });
+
+    // Clear old route/markers and draw the new route.
+    await _addRideMarkers();
+
+    final pickupLatitude = double.tryParse(
+      ride['pickupLatitude']?.toString() ?? '',
+    );
+
+    final pickupLongitude = double.tryParse(
+      ride['pickupLongitude']?.toString() ?? '',
+    );
+
+    // Move the map to the selected driver's pickup location.
+    if (pickupLatitude != null && pickupLongitude != null) {
+      await _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(pickupLatitude, pickupLongitude),
+            zoom: 13,
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Gets the route from OSRM and draws it on MapLibre.
   Future<void> _drawRoute({
     required double pickupLatitude,
     required double pickupLongitude,
@@ -186,6 +253,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
       final routePoints = coordinates.map<LatLng>((coordinate) {
         final longitude = (coordinate[0] as num).toDouble();
+
         final latitude = (coordinate[1] as num).toDouble();
 
         return LatLng(latitude, longitude);
@@ -210,28 +278,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Could not load route: $e')));
     }
-  }
-
-  Future<void> _focusOnRide(Map<String, dynamic> ride) async {
-    if (_mapController == null) {
-      return;
-    }
-
-    final latitude = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
-
-    final longitude = double.tryParse(
-      ride['pickupLongitude']?.toString() ?? '',
-    );
-
-    if (latitude == null || longitude == null) {
-      return;
-    }
-
-    await _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: LatLng(latitude, longitude), zoom: 14),
-      ),
-    );
   }
 
   Future<void> _requestRide(Map<String, dynamic> ride) async {
@@ -349,6 +395,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
       onStyleLoadedCallback: () async {
         _mapStyleLoaded = true;
+
         await _addRideMarkers();
       },
     );
@@ -523,6 +570,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
     final isRequesting = rideId != null && _requestingRideId == rideId;
 
+    final isSelected = rideId != null && _selectedRideId == rideId;
+
     final pickup = ride['pickupAddress']?.toString() ?? 'Unknown pickup';
 
     final destination =
@@ -536,11 +585,18 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
     return Card(
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
-      elevation: 1,
+      elevation: isSelected ? 5 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected ? colorScheme.primary : Colors.transparent,
+          width: isSelected ? 2 : 0,
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          _focusOnRide(ride);
+          _selectRide(ride);
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -581,6 +637,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                           color: colorScheme.primary,
                         ),
                       ),
+
                       const Text(
                         'estimated fare',
                         style: TextStyle(fontSize: 11),
@@ -685,10 +742,15 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
               const SizedBox(height: 8),
 
               Text(
-                'Tap the ride to view its pickup location',
+                isSelected
+                    ? 'Route currently shown on the map'
+                    : 'Tap the ride to view its route',
                 style: TextStyle(
                   fontSize: 11,
-                  color: colorScheme.onSurfaceVariant,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
 
