@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+
+import 'dart:convert';
+
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:http/http.dart' as http;
 
 import 'models/auth.dart';
 import 'services/auth_service.dart';
@@ -24,6 +28,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
   int? _requestingRideId;
 
+  MapLibreMapController? _mapController;
+
+  bool _mapStyleLoaded = false;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +47,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       final user = await _authService.getUser();
 
       final rides = await _authService.getAvailableRides();
+      debugPrint('AVAILABLE RIDES: $rides');
 
       if (!mounted) return;
 
@@ -47,6 +56,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         _rides = rides;
         _isLoading = false;
       });
+
+      await _addRideMarkers();
     } catch (e) {
       if (!mounted) return;
 
@@ -58,6 +69,169 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
+  }
+
+  Future<void> _addRideMarkers() async {
+    if (_mapController == null || !_mapStyleLoaded) {
+      return;
+    }
+
+    try {
+      await _mapController!.clearCircles();
+      await _mapController!.clearLines();
+
+      for (final ride in _rides) {
+        final pickupLatitude = double.tryParse(
+          ride['pickupLatitude']?.toString() ?? '',
+        );
+
+        final pickupLongitude = double.tryParse(
+          ride['pickupLongitude']?.toString() ?? '',
+        );
+
+        final destinationLatitude = double.tryParse(
+          ride['destinationLatitude']?.toString() ?? '',
+        );
+
+        final destinationLongitude = double.tryParse(
+          ride['destinationLongitude']?.toString() ?? '',
+        );
+
+        // BLUE DOT = Pickup / Start
+        if (pickupLatitude != null && pickupLongitude != null) {
+          await _mapController!.addCircle(
+            CircleOptions(
+              geometry: LatLng(pickupLatitude, pickupLongitude),
+              circleRadius: 9,
+              circleColor: '#0000FF',
+              circleOpacity: 1.0,
+              circleStrokeWidth: 3,
+              circleStrokeColor: '#FFFFFF',
+            ),
+          );
+        }
+
+        // RED DOT = Destination / Eduvos
+        if (destinationLatitude != null && destinationLongitude != null) {
+          await _mapController!.addCircle(
+            CircleOptions(
+              geometry: LatLng(destinationLatitude, destinationLongitude),
+              circleRadius: 9,
+              circleColor: '#FF0000',
+              circleOpacity: 1.0,
+              circleStrokeWidth: 3,
+              circleStrokeColor: '#FFFFFF',
+            ),
+          );
+        }
+
+        // DRAW THE ACTUAL ROAD ROUTE
+        if (pickupLatitude != null &&
+            pickupLongitude != null &&
+            destinationLatitude != null &&
+            destinationLongitude != null) {
+          await _drawRoute(
+            pickupLatitude: pickupLatitude,
+            pickupLongitude: pickupLongitude,
+            destinationLatitude: destinationLatitude,
+            destinationLongitude: destinationLongitude,
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not load map route: $e')));
+    }
+  }
+
+  Future<void> _drawRoute({
+    required double pickupLatitude,
+    required double pickupLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) async {
+    if (_mapController == null || !_mapStyleLoaded) {
+      return;
+    }
+
+    try {
+      final url =
+          'https://router.project-osrm.org/route/v1/driving/'
+          '$pickupLongitude,$pickupLatitude;'
+          '$destinationLongitude,$destinationLatitude'
+          '?overview=full&geometries=geojson';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode != 200) {
+        throw Exception('OSRM returned status ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (data['code'] != 'Ok') {
+        throw Exception('OSRM could not find a route.');
+      }
+
+      final routes = data['routes'];
+
+      if (routes == null || routes.isEmpty) {
+        throw Exception('No route was found.');
+      }
+
+      final coordinates = routes[0]['geometry']['coordinates'] as List;
+
+      final routePoints = coordinates.map<LatLng>((coordinate) {
+        final longitude = (coordinate[0] as num).toDouble();
+        final latitude = (coordinate[1] as num).toDouble();
+
+        return LatLng(latitude, longitude);
+      }).toList();
+
+      if (routePoints.isEmpty) {
+        return;
+      }
+
+      await _mapController!.addLine(
+        LineOptions(
+          geometry: routePoints,
+          lineColor: '#0F6E56',
+          lineWidth: 5.0,
+          lineOpacity: 0.9,
+          lineJoin: 'round',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not load route: $e')));
+    }
+  }
+
+  Future<void> _focusOnRide(Map<String, dynamic> ride) async {
+    if (_mapController == null) {
+      return;
+    }
+
+    final latitude = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
+
+    final longitude = double.tryParse(
+      ride['pickupLongitude']?.toString() ?? '',
+    );
+
+    if (latitude == null || longitude == null) {
+      return;
+    }
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: LatLng(latitude, longitude), zoom: 14),
+      ),
+    );
   }
 
   Future<void> _requestRide(Map<String, dynamic> ride) async {
@@ -161,18 +335,29 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     );
   }
 
+  Widget _buildMap() {
+    return MapLibreMap(
+      initialCameraPosition: const CameraPosition(
+        target: LatLng(-33.88, 18.63),
+        zoom: 11,
+      ),
+      styleString: 'https://tiles.openfreemap.org/styles/bright',
+
+      onMapCreated: (controller) {
+        _mapController = controller;
+      },
+
+      onStyleLoadedCallback: () async {
+        _mapStyleLoaded = true;
+        await _addRideMarkers();
+      },
+    );
+  }
+
   Widget _buildEmptyState(ColorScheme colorScheme) {
     return Stack(
       children: [
-        Positioned.fill(
-          child: MapLibreMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(-33.88, 18.63),
-              zoom: 11,
-            ),
-            styleString: 'https://tiles.openfreemap.org/styles/bright',
-          ),
-        ),
+        Positioned.fill(child: _buildMap()),
 
         Align(
           alignment: Alignment.bottomCenter,
@@ -242,23 +427,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
   Widget _buildRideContent(ColorScheme colorScheme) {
     return Stack(
       children: [
-        // -------------------------------------------------------------
-        // MAP
-        // -------------------------------------------------------------
+        Positioned.fill(child: _buildMap()),
 
-        Positioned.fill(
-          child: MapLibreMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(-33.88, 18.63),
-              zoom: 11,
-            ),
-            styleString: 'https://tiles.openfreemap.org/styles/bright',
-          ),
-        ),
-
-        // -------------------------------------------------------------
-        // RIDE LIST
-        // -------------------------------------------------------------
         DraggableScrollableSheet(
           initialChildSize: 0.48,
           minChildSize: 0.25,
@@ -284,7 +454,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                 controller: scrollController,
                 padding: EdgeInsets.zero,
                 children: [
-                  // Drag handle
                   Container(
                     padding: const EdgeInsets.only(top: 10, bottom: 5),
                     child: Center(
@@ -301,7 +470,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                     ),
                   ),
 
-                  // Heading
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
                     child: Row(
@@ -336,7 +504,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                     ),
                   ),
 
-                  // Ride cards
                   ..._rides.map((ride) => _buildRideCard(context, ride)),
 
                   const SizedBox(height: 20),
@@ -370,181 +537,184 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     return Card(
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
       elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ---------------------------------------------------------
-            // RIDE HEADER
-            // ---------------------------------------------------------
-
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: colorScheme.primaryContainer,
-                  child: Icon(
-                    Icons.person,
-                    color: colorScheme.onPrimaryContainer,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          _focusOnRide(ride);
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: colorScheme.primaryContainer,
+                    child: Icon(
+                      Icons.person,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
                   ),
-                ),
 
-                const SizedBox(width: 12),
+                  const SizedBox(width: 12),
 
-                const Expanded(
-                  child: Text(
-                    'Driver',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                  ),
-                ),
-
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      fare,
+                  const Expanded(
+                    child: Text(
+                      'Driver',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
                       ),
                     ),
-                    const Text(
-                      'estimated fare',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
 
-            const SizedBox(height: 16),
-
-            // ---------------------------------------------------------
-            // PICKUP
-            // ---------------------------------------------------------
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.location_on_outlined,
-                  size: 21,
-                  color: colorScheme.primary,
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
-                        'Pickup',
+                      Text(
+                        fare,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
                         ),
                       ),
-
-                      const SizedBox(height: 2),
-
-                      Text(pickup, style: const TextStyle(fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // ---------------------------------------------------------
-            // DESTINATION
-            // ---------------------------------------------------------
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.school_outlined,
-                  size: 21,
-                  color: colorScheme.primary,
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
                       const Text(
-                        'Destination',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'estimated fare',
+                        style: TextStyle(fontSize: 11),
                       ),
-
-                      const SizedBox(height: 2),
-
-                      Text(destination, style: const TextStyle(fontSize: 14)),
                     ],
                   ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 14),
-
-            // ---------------------------------------------------------
-            // RIDE DETAILS
-            // ---------------------------------------------------------
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetail(
-                    icon: Icons.access_time_outlined,
-                    text: scheduled,
-                    colorScheme: colorScheme,
-                  ),
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: _buildDetail(
-                    icon: Icons.people_outline,
-                    text: '$seats seats',
-                    colorScheme: colorScheme,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // ---------------------------------------------------------
-            // REQUEST BUTTON
-            // ---------------------------------------------------------
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: isRequesting
-                    ? null
-                    : () {
-                        _requestRide(ride);
-                      },
-                icon: isRequesting
-                    ? const SizedBox(
-                        width: 19,
-                        height: 19,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.directions_car_outlined),
-                label: Text(isRequesting ? 'Requesting...' : 'Request Ride'),
+                ],
               ),
-            ),
-          ],
+
+              const SizedBox(height: 16),
+
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 21,
+                    color: colorScheme.primary,
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pickup',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 2),
+
+                        Text(pickup, style: const TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.school_outlined,
+                    size: 21,
+                    color: colorScheme.primary,
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Destination',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 2),
+
+                        Text(destination, style: const TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetail(
+                      icon: Icons.access_time_outlined,
+                      text: scheduled,
+                      colorScheme: colorScheme,
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: _buildDetail(
+                      icon: Icons.people_outline,
+                      text: '$seats seats',
+                      colorScheme: colorScheme,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                'Tap the ride to view its pickup location',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: isRequesting
+                      ? null
+                      : () {
+                          _requestRide(ride);
+                        },
+                  icon: isRequesting
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.directions_car_outlined),
+                  label: Text(isRequesting ? 'Requesting...' : 'Request Ride'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

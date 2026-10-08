@@ -193,9 +193,6 @@ class AuthService {
 
     final response = await http.Response.fromStream(streamedResponse);
 
-    print('PROFILE UPLOAD STATUS: ${response.statusCode}');
-    print('PROFILE UPLOAD RESPONSE: ${response.body}');
-
     final data = jsonDecode(response.body);
 
     if (response.statusCode == 200 && data['success'] == true) {
@@ -575,6 +572,10 @@ class AuthService {
     );
 
     if (response.statusCode == 200) {
+      print('========== AVAILABLE RIDES RAW RESPONSE ==========');
+      print(response.body);
+      print('===================================================');
+
       final data = jsonDecode(response.body);
 
       return List<Map<String, dynamic>>.from(data['rides'] ?? []);

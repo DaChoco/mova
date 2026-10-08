@@ -69,6 +69,7 @@ flutter:
 
   assets:
     - assets/mova-icon.png
+    - assets/red_pin.png
 
 flutter_launcher_icons:
   android: true
