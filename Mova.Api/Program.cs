@@ -4,7 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Mova.Api.Data;
 using Microsoft.Extensions.FileProviders;
+using Mova.Api.Helpers;
+using DotNetEnv;
 
+Env.Load("../.env");
 var builder = WebApplication.CreateBuilder(args);
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.

@@ -1,4 +1,4 @@
-namespace Mova.Api.Helpers
+namespace Mova.Api.Helpers;
 using System.IO;
 using System;
 using System.Net.Http.Headers;
@@ -9,8 +9,6 @@ public class SupabaseStorageService
 {
     private readonly IConfiguration _configuration;
     private readonly HttpClient _httpClient;
-    Env.Load("../.env");
-    var builder = WebApplication.CreateBuilder(args);
 
     public SupabaseStorageService(
         IConfiguration configuration,
@@ -27,8 +25,8 @@ public class SupabaseStorageService
         Stream fileStream,
         string contentType)
     {
-        var supabaseUrl = builder.Configuration["SUPABASE_URL"]; 
-        var serviceKey = builder.Configuration["SUPABASE_SERVICE_KEY"];
+        var supabaseUrl = _configuration["SUPABASE_URL"];
+        var serviceKey = _configuration["SUPABASE_SERVICE_KEY"];
 
         if (string.IsNullOrEmpty(supabaseUrl))
             throw new InvalidOperationException("Supabase URL is not configured.");
