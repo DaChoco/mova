@@ -47,7 +47,7 @@ public class UserController : ControllerBase
             isDriver = user.IsDriver,
             carID = user.CarId,
             profileIcon = user.ProfileIcon != null
-                ? $"{Request.Scheme}://{Request.Host}/profilepicture/{user.ProfileIcon}"
+                ? user.ProfileIcon
                 : null
         }
     });
@@ -213,7 +213,7 @@ public class UserController : ControllerBase
             return StatusCode(500, new
             {
                 success = false,
-                message = ex.ToString()
+                message = "An error occurred while uploading the profile picture.",
             });
         }
     }
