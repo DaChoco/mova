@@ -45,8 +45,8 @@ public class MessagesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> PostMessage(string rideId, [FromBody] SendMessageRequest req)
     {
-        var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!);
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!;
 
         // TODO: once Ride model exists, confirm currentUserId is actually the rider
         // or driver on this ride, and set senderType from that lookup instead of
@@ -54,7 +54,7 @@ public class MessagesController : ControllerBase
         var doc = new MessageDocument
         {
             RideId = rideId,
-            SenderId = currentUserId,
+            SenderId = int.Parse(currentUserId),
             SenderType = "rider", // placeholder until Ride model exists
             Message = req.Message,
             SentAt = DateTime.UtcNow,
@@ -119,11 +119,11 @@ public class MessagesController : ControllerBase
     [Route("/api/chats")]
     public async Task<IActionResult> GetMyChats()
     {
-    var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")!;
 
     var myMessages = await _mongo.Messages
-        .Find(m => m.SenderId == currentUserId)
+        .Find(m => m.SenderId == int.Parse(currentUserId))
         .ToListAsync();
 
     var chats = myMessages
