@@ -20,17 +20,19 @@ class MessageSent{
 //MessageRecieved[{}, {}] 
 //Comes from C# ASP.net 
 class MessageRecieved{
+  final String messageID;
   final String rideID;
-  final String userID;
-  final String driverID;
+  final String senderID;
+  final String senderType;
   final String message;
   final String datetime;
   final bool isRead;
 
   MessageRecieved({
+    required this.messageID,
     required this.rideID,
-    required this.userID,
-    required this.driverID,
+    required this.senderID,
+    required this.senderType,
     required this.message,
     required this.datetime,
     required this.isRead
@@ -38,11 +40,12 @@ class MessageRecieved{
 
   factory MessageRecieved.fromJson(Map<String, dynamic> json) {
     return MessageRecieved(
-      rideID: json['rideID'] as String,
-      userID: json['userID'] as String,
-      driverID: json['driverID'] as String,
+      messageID: json['_id'] as String,
+      rideID: json['rideId'] as String,
+      senderID: json['senderId'] as String,
+      senderType: json['senderType'] as String,
       message: json['message'] as String,
-      datetime: json['datetime'] as String,
+      datetime: json['sentAt'] as String,
       isRead: json['isRead'] as bool,
     );
   }
