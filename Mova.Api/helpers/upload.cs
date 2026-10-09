@@ -28,8 +28,17 @@ namespace Mova.Api.Helpers
             Stream fileStream,
             string contentType)
         {
-            var supabaseUrl = _configuration["SUPABASE_URL"];
-            var serviceKey = _configuration["SUPABASE_SERVICE_KEY"];
+            var supabaseUrl = _configuration["SUPABASE_URL"]?.Trim().TrimEnd('/', ';'); ;
+            var serviceKey = _configuration["SUPABASE_SERVICE_KEY"]?.Trim().TrimEnd('/', ';'); ;
+
+            Console.WriteLine($"Supabase URL: '{supabaseUrl}'");
+
+            Console.WriteLine(
+                $"Service key prefix: " +
+                $"{serviceKey?.Substring(0, Math.Min(10, serviceKey.Length))}");
+
+            Console.WriteLine(
+                $"Service key length: {serviceKey?.Length}");
 
             if (string.IsNullOrEmpty(supabaseUrl))
                 throw new InvalidOperationException("Supabase URL is not configured.");
@@ -42,32 +51,27 @@ namespace Mova.Api.Helpers
             var url =
                 $"{supabaseUrl}/storage/v1/object/{bucketName}/{filePath}";
 
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                url);
 
-            request.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", serviceKey);
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
 
             request.Headers.Add("apikey", serviceKey);
-
             request.Headers.Add("x-upsert", "true");
 
-            var content = new StreamContent(fileStream);
-
-            content.Headers.ContentType =
+            request.Content = new StreamContent(fileStream);
+            request.Content.Headers.ContentType =
                 new MediaTypeHeaderValue(contentType);
 
-            request.Content = content;
+            using var response = await _httpClient.SendAsync(request);
 
-            var response = await _httpClient.SendAsync(request);
-
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var responseBody =
+                await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception(
-                    $"Supabase upload failed: {response.StatusCode} - {responseBody}");
+                    $"Supabase upload failed: " +
+                    $"{(int)response.StatusCode} " +
+                    $"{response.StatusCode} - {responseBody}");
             }
 
             // Public URL
