@@ -44,11 +44,12 @@ class Conversation {
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
-    rideId: json['rideId'],
-    otherUserId: json['otherUserId'],
-    otherUserName: json['otherUserName'],
-    lastMessage: json['lastMessage'],
-    updatedAt: DateTime.parse(json['sentAt']).toLocal(),
+    rideId: json['rideId'].toString(),
+    otherUserId: (json['otherUserId'] as num?)?.toInt() ?? 0,
+    otherUserName: json['otherUserName']?.toString() ?? 'Unknown',
+    lastMessage: json['lastMessage']?.toString() ?? '',
+    updatedAt: DateTime.parse(json['sentAt'] ?? json['lastMessageAt'])
+        .toLocal(),
   );
 }
 
