@@ -11,7 +11,7 @@ public class MessageDocument
     public string? Id { get; set; }
 
     public string RideId { get; set; } = "";
-    public string SenderId { get; set; } = "";
+    public int SenderId { get; set; } = 0;
     public string SenderType { get; set; } = "";
     public string Message { get; set; } = "";
     public DateTime SentAt { get; set; }
