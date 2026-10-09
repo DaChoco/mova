@@ -9,28 +9,6 @@ using Mova.Api.Models;
 namespace Mova.Api.Controllers;
 
 [ApiController]
-[Route("/api/rides/{rideId}/messages/{messageId}/read")]
-[Authorize]
-public class IsReadController : ControllerBase
-{
-    private readonly MongoDbContext _mongo;
-    public IsReadController(MongoDbContext mongo)
-    {
-        _mongo = mongo;
-    }
-    [HttpPost]
-    public async Task<IActionResult> MarkAsRead(string rideId, string messageId)
-    {
-        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!;
-        var update = Builders<MessageDocument>.Update.Set(m => m.IsRead, true);
-        await _mongo.Messages.UpdateManyAsync(
-            m => m.RideId == rideId && m.Id == messageId && m.SenderId != currentUserId && !m.IsRead,
-            update
-        );
-        return Ok(new { success = true });
-    }
-}
 [Route("api/rides/{rideId}/messages")]
 [Authorize]
 public class MessagesController : ControllerBase
@@ -53,8 +31,9 @@ public class MessagesController : ControllerBase
         var result = messages.Select(m => new MessageDto
         {
             MessageId = m.Id,
-         //   SenderId = m.SenderId,
-            SenderType = m.SenderType,
+            RideId = m.RideId,
+            SenderId = m.SenderId,
+            SenderType = m.SenderType ?? string.Empty,
             Message = m.Message,
             SentAt = m.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             IsRead = m.IsRead
@@ -96,6 +75,41 @@ public class MessagesController : ControllerBase
                 sentAt = doc.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
                 isRead = doc.IsRead
             }
+        });
+    }
+
+    [HttpPatch("{messageId}/read")]
+    public async Task<IActionResult> MarkMessageAsRead(
+    string rideId,
+    string messageId)
+    {
+        var filter = Builders<MessageDocument>.Filter.And(
+            Builders<MessageDocument>.Filter.Eq(m => m.Id, messageId),
+            Builders<MessageDocument>.Filter.Eq(m => m.RideId, rideId)
+        );
+
+        var update = Builders<MessageDocument>.Update
+            .Set(m => m.IsRead, true);
+
+        var result = await _mongo.Messages.UpdateOneAsync(
+            filter,
+            update
+        );
+
+        if (result.MatchedCount == 0)
+        {
+            return NotFound(new
+            {
+                success = false,
+                message = "Message not found."
+            });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            messageId = messageId,
+            isRead = true
         });
     }
 
