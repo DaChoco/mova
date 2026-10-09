@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'config/app_config.dart';
 import 'register_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoggingIn = false;
 
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   @override
@@ -52,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Get the logged-in user's details
       final user = await _authService.getUser();
+      print(user.profileIcon);
 
       if (!mounted) return;
 

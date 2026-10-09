@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mova/config/app_config.dart';
 
 import 'services/auth_service.dart';
 
@@ -11,7 +12,7 @@ class MyRidesScreen extends StatefulWidget {
 
 class _MyRidesScreenState extends State<MyRidesScreen> {
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   List<Map<String, dynamic>> _rides = [];

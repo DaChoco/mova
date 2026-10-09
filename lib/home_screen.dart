@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-
+import 'config/app_config.dart';
 import 'profile_screen.dart';
 import 'main.dart';
 import 'find_driver_screen.dart';
@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late User _user;
 
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   Map<String, dynamic>? _upcomingRide;
@@ -43,7 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // Load the profile picture as soon as the home screen starts,
     // so the drawer shows it without opening the profile screen first.
     if (_user.profileIcon != null && _user.profileIcon!.isNotEmpty) {
-      loadProfileImage(_user.profileIcon);
+      String profileURL = '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
+      print(profileURL);
+      loadProfileImage(profileURL);
     } else {
       // The login response may not include profileIcon, so fetch the
       // full user from the backend to get it.

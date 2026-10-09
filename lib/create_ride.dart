@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
-
+import 'config/app_config.dart';
 import '../services/auth_service.dart';
 
 class CreateRideScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       TextEditingController();
 
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   DateTime? _selectedDate;

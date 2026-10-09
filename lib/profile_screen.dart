@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:mova/config/app_config.dart';
 
 import '../models/auth.dart';
 import '../services/auth_service.dart';
@@ -46,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late User _user;
 
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   bool _isUploadingImage = false;
@@ -82,7 +83,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // HomeScreen normally loads the picture already. Only download it
     // here if the notifier is still empty.
     if (profileImageNotifier.value == null) {
-      loadProfileImage(_user.profileIcon);
+      String profileURL = '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
+      print(profileURL);
+      loadProfileImage(profileURL);
     }
   }
 

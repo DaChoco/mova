@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mova/config/app_config.dart';
 
 import 'login_screen.dart';
 import 'models/auth.dart';
@@ -26,7 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Use the same backend address that worked for your login.
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   @override

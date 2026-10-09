@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-
+import '../config/app_config.dart';
 import 'auth_service.dart';
 
-const _host = 'http://26.223.171.250:80';
+const _host = AppConfig.backendBaseUrl;
 
 // Bumped whenever a message is sent so chat lists reload themselves
 final ValueNotifier<int> chatsChanged = ValueNotifier<int>(0);

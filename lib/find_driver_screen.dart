@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:mova/config/app_config.dart';
 
 import 'models/auth.dart';
 import 'services/auth_service.dart';
@@ -16,7 +17,7 @@ class FindDriverScreen extends StatefulWidget {
 
 class _FindDriverScreenState extends State<FindDriverScreen> {
   final AuthService _authService = AuthService(
-    baseUrl: 'http://26.223.171.250:80',
+    baseUrl: AppConfig.backendBaseUrl,
   );
 
   User? _currentUser;

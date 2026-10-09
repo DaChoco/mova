@@ -175,7 +175,7 @@ class AuthService {
 
     final request = http.MultipartRequest(
       'POST',
-      Uri.parse('$baseUrl/api/user/profile-picture'),
+      Uri.parse('$baseUrl/api/user/profile/upload'),
     );
 
     request.headers['Authorization'] = 'Bearer $token';
@@ -202,14 +202,14 @@ class AuthService {
       final returnedUrl = data['url'] as String;
 
       // The backend currently returns:
-      // /profilepicture/filename.jpg
+      // /{userid}/filename.jpg
       //
       // Convert it into a complete URL for Flutter.
       if (returnedUrl.startsWith('http')) {
         return returnedUrl;
       }
 
-      return '$baseUrl$returnedUrl';
+      return  returnedUrl;
     }
 
     if (response.statusCode == 400) {

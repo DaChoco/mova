@@ -91,7 +91,7 @@ class _ChatListState extends State<ChatList> {
         }
 
         if (snap.hasError) {
-  debugPrint('❌ [ChatList] Failed to load chats');
+  debugPrint('[ChatList] Failed to load chats');
   debugPrint('Error: ${snap.error}');
   debugPrint('Stack trace:\n${snap.stackTrace}');
 
