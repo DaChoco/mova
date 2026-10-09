@@ -137,6 +137,67 @@ public class RidesController : ControllerBase
         return Ok(new { success = true, ride = passengerRideId is null ? null : ToDto(passengerRideId) });
     }
 
+    // NEW: all active rides created by the logged-in driver (My Rides screen)
+    [HttpGet("mine")]
+    public async Task<IActionResult> GetMine()
+    {
+        var userId = CurrentUserId();
+        var activeStatuses = new[] { "searching_driver", "in_progress" };
+
+        var rides = await _db.Rides
+            .Where(r => r.DriverId == userId && activeStatuses.Contains(r.Status))
+            .OrderBy(r => r.ScheduledFor)
+            .Select(r => new
+            {
+                ride = r,
+                accepted = _db.RideRequests.Count(rr => rr.RideId == r.RideId && rr.Status == "accepted"),
+                pending = _db.RideRequests.Count(rr => rr.RideId == r.RideId && rr.Status == "pending")
+            })
+            .ToListAsync();
+
+        return Ok(new { success = true, rides = rides.Select(x => ToDto(x.ride, x.accepted, x.pending)) });
+    }
+
+    // NEW: the next ride a driver has accepted the logged-in user on as a passenger
+    // (home screen "Upcoming Ride" card)
+    [HttpGet("accepted")]
+    public async Task<IActionResult> GetAccepted()
+    {
+        var userId = CurrentUserId();
+        var activeStatuses = new[] { "searching_driver", "in_progress" };
+
+        var ride = await _db.Rides
+            .Include(r => r.Driver)
+            .Where(r => activeStatuses.Contains(r.Status)
+                     && r.ScheduledFor > DateTime.UtcNow
+                     && _db.RideRequests.Any(rr => rr.RideId == r.RideId
+                                                && rr.PassengerId == userId
+                                                && rr.Status == "accepted"))
+            .OrderBy(r => r.ScheduledFor)
+            .FirstOrDefaultAsync();
+
+        return Ok(new { success = true, ride = ride is null ? null : ToDto(ride) });
+    }
+
+    // NEW: driver permanently deletes their own ride and its passenger requests
+    [HttpDelete("{rideId}")]
+    public async Task<IActionResult> Delete(int rideId)
+    {
+        var ride = await _db.Rides.FindAsync(rideId);
+        if (ride is null) return NotFound(new { success = false });
+
+        if (ride.DriverId != CurrentUserId())
+            return Forbid();
+
+        // Requests must go first because the foreign key is DeleteBehavior.Restrict
+        var requests = await _db.RideRequests.Where(rr => rr.RideId == rideId).ToListAsync();
+        _db.RideRequests.RemoveRange(requests);
+        _db.Rides.Remove(ride);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { success = true });
+    }
+
     // Passenger requests to join a ride
     [HttpPost("{rideId}/request")]
     public async Task<IActionResult> RequestToJoin(int rideId)
@@ -379,7 +440,8 @@ public class RidesController : ControllerBase
 
     private static double ToRad(double deg) => deg * Math.PI / 180;
 
-    private static object ToDto(Ride r) => new
+    // CHANGED: optional counts and driverName added
+    private static object ToDto(Ride r, int? acceptedCount = null, int? pendingCount = null) => new
     {
         rideId = r.RideId,
         status = r.Status,
@@ -395,6 +457,10 @@ public class RidesController : ControllerBase
         availableSeats = r.AvailableSeats,
         scheduledFor = r.ScheduledFor.ToString("yyyy-MM-ddTHH:mm:ssZ"),
         estimatedFare = r.EstimatedFare,
-        requestedAt = r.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        requestedAt = r.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+
+        driverName = r.Driver == null ? null : r.Driver.FirstName + " " + r.Driver.Surname,
+        acceptedCount,
+        pendingCount
     };
 }
