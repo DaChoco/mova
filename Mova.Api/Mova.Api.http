@@ -1,5 +1,5 @@
 @Mova_HostAddress = http://26.223.171.250
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkxNDU4MjQ3LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.rLpxzanCYc2-VaRMSj7G_tL72jo3roHhVgacjpyQ2xo
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkxNTQ5Mjk0LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.cjEiZ8UqaTC_rvoaybZe4sjTsG9-y6rosPfWzk7PJU4
 
 @driverToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwic3R1ZGVudE51bWJlciI6IkVEVVYxMjM0NTY3IiwiZXhwIjoxNzkxNDU3ODc4LCJpc3MiOiJNb3ZhQXBpIiwiYXVkIjoiTW92YUFwcCJ9.bQ72kSV7xPee0srMNRSb_m0frA2TEXpbiSGgIo2lqqg
 
@@ -190,3 +190,6 @@ Content-Type: application/json
 {
   "passengerId": 2
 }
+### 3. Passenger browses available rides (should list both, soonest first)
+GET {{Mova_HostAddress}}/api/rides/available
+Authorization: Bearer {{{{token}}}}

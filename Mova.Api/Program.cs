@@ -70,7 +70,7 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
         Path.Combine(builder.Environment.ContentRootPath, "profilepicture")),
-    RequestPath = "./profilepicture"
+    RequestPath = "/profilepicture"
 });
 
 app.UseAuthentication();   // must come before UseAuthorization

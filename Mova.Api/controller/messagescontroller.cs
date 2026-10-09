@@ -21,8 +21,8 @@ public class IsReadController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> MarkAsRead(string rideId, string messageId)
     {
-        var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!);
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!;
         var update = Builders<MessageDocument>.Update.Set(m => m.IsRead, true);
         await _mongo.Messages.UpdateManyAsync(
             m => m.RideId == rideId && m.Id == messageId && m.SenderId != currentUserId && !m.IsRead,
@@ -53,7 +53,7 @@ public class MessagesController : ControllerBase
         var result = messages.Select(m => new MessageDto
         {
             MessageId = m.Id,
-            SenderId = m.SenderId,
+         //   SenderId = m.SenderId,
             SenderType = m.SenderType,
             Message = m.Message,
             SentAt = m.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
@@ -66,8 +66,8 @@ public class MessagesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> PostMessage(string rideId, [FromBody] SendMessageRequest req)
     {
-        var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!);
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!;
 
         // TODO: once Ride model exists, confirm currentUserId is actually the rider
         // or driver on this ride, and set senderType from that lookup instead of
@@ -105,8 +105,8 @@ public class MessagesController : ControllerBase
     [Route("/api/chats")]
     public async Task<IActionResult> GetMyChats()
     {
-    var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")!;
 
     var myMessages = await _mongo.Messages
         .Find(m => m.SenderId == currentUserId)
