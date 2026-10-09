@@ -91,16 +91,23 @@ class _ChatListState extends State<ChatList> {
         }
 
         if (snap.hasError) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Could not load chats'),
-                TextButton(onPressed: _reload, child: const Text('Retry')),
-              ],
-            ),
-          );
-        }
+  debugPrint('❌ [ChatList] Failed to load chats');
+  debugPrint('Error: ${snap.error}');
+  debugPrint('Stack trace:\n${snap.stackTrace}');
+
+  return Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Could not load chats'),
+        TextButton(
+          onPressed: _reload,
+          child: const Text('Retry'),
+        ),
+      ],
+    ),
+  );
+}
 
         final all = snap.data ?? [];
 
