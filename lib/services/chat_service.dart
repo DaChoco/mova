@@ -74,14 +74,48 @@ class ChatService {
     return res;
   }
 
+  final Map<int, String> _nameCache = {};
+
+  Future<String> _nameFor(int userId, String fallback) async {
+    if (userId == 0) return fallback;
+    final cached = _nameCache[userId];
+    if (cached != null) return cached;
+    try {
+      final user = await getUser(userId.toString());
+      final first = user['firstName']?.toString() ?? '';
+      final last = user['surname']?.toString() ?? '';
+      final name = '$first $last'.trim();
+      final resolved = name.isEmpty ? fallback : name;
+      _nameCache[userId] = resolved;
+      return resolved;
+    } catch (e) {
+      debugPrint('getUser failed for $userId: $e');
+      return fallback;
+    }
+  }
+
   Future<List<Conversation>> getConversations() async {
     final res = await _call(
       (h) => http.get(Uri.parse('$_host/api/chats'), headers: h),
     );
     if (res.statusCode != 200) throw Exception('Failed to load chats');
-    return (jsonDecode(res.body)['chats'] as List)
+
+    final convos = (jsonDecode(res.body)['chats'] as List)
         .map((c) => Conversation.fromJson(c))
         .toList();
+
+    return Future.wait(
+      convos.map((c) async {
+        final name = await _nameFor(c.otherUserId, c.otherUserName);
+        return Conversation(
+          rideId: c.rideId,
+          otherUserId: c.otherUserId,
+          otherUserName: name,
+          lastMessage: c.lastMessage,
+          updatedAt: c.updatedAt,
+        );
+      }),
+    );
   }
 
   Future<List<Message>> getMessages(String rideId) async {
