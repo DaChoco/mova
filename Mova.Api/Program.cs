@@ -7,14 +7,18 @@ using Mova.Api.Helpers;
 using Microsoft.Extensions.FileProviders;
 using DotNetEnv;
 
-Env.Load("./.env");
+Env.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
 var builder = WebApplication.CreateBuilder(args);
 
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<
+        Mova.Api.Helpers.BearerSecuritySchemeTransformer>();
+});
 
 builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("MongoDB"));
 builder.Services.AddSingleton<MongoDbContext>();

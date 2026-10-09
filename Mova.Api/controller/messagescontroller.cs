@@ -31,6 +31,7 @@ public class MessagesController : ControllerBase
         var result = messages.Select(m => new MessageDto
         {
             MessageId = m.Id,
+            RideId = m.RideId,
             SenderId = m.SenderId,
             SenderType = m.SenderType ?? string.Empty,
             Message = m.Message,
