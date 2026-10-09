@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -29,6 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
     baseUrl: 'http://26.223.171.250:80',
   );
 
+  Map<String, dynamic>? _upcomingRide;
+  bool _isLoadingRide = true;
+  Timer? _rideRefreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +49,134 @@ class _HomeScreenState extends State<HomeScreen> {
       // full user from the backend to get it.
       _refreshUser();
     }
+
+    _loadUpcomingRide();
+
+    // The driver accepts requests on another device, so poll for changes.
+    _rideRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadUpcomingRide(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _rideRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  // The next ride a driver has accepted this user on as a passenger.
+  // Rides the user created themselves are not shown here.
+  Future<void> _loadUpcomingRide() async {
+    try {
+      final ride = await _authService.getAcceptedRide();
+
+      if (!mounted) return;
+
+      setState(() {
+        _upcomingRide = ride;
+        _isLoadingRide = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      // Keep the last known ride if a refresh fails.
+      setState(() => _isLoadingRide = false);
+    }
+  }
+
+  String _formatScheduled(dynamic scheduledFor) {
+    final date = DateTime.tryParse('$scheduledFor')?.toLocal();
+
+    if (date == null) return 'Unknown time';
+
+    String two(int n) => n.toString().padLeft(2, '0');
+
+    return '${two(date.day)}/${two(date.month)}/${date.year} '
+        'at ${two(date.hour)}:${two(date.minute)}';
+  }
+
+  Widget _buildUpcomingRide(ColorScheme colorScheme) {
+    if (_isLoadingRide) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final ride = _upcomingRide;
+
+    if (ride == null) {
+      return Center(
+        child: Column(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.directions_car_outlined,
+                color: colorScheme.primary,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'No upcoming rides',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Your next ride will appear here',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final pickup = ride['pickupAddress']?.toString() ?? 'Unknown pickup';
+    final destination =
+        ride['destinationAddress']?.toString() ?? 'Unknown destination';
+
+    Widget line(IconData icon, String text) => Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Driver accepted your request',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.primary,
+          ),
+        ),
+        line(Icons.location_on_outlined, pickup),
+        line(Icons.school_outlined, destination),
+        line(
+          Icons.access_time_outlined,
+          _formatScheduled(ride['scheduledFor']),
+        ),
+        if (ride['driverName'] != null)
+          line(Icons.person_outline, 'Driver: ${ride['driverName']}'),
+      ],
+    );
   }
 
   // Get the latest user information from the backend.
@@ -147,19 +280,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // My Rides
-              ListTile(
-                leading: const Icon(Icons.directions_car),
-                title: const Text('My Rides', style: TextStyle(fontSize: 16)),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MyRidesScreen(),
-                    ),
-                  );
-                },
-              ),
+              // My Rides (drivers only)
+              if (_user.isDriver)
+                ListTile(
+                  leading: const Icon(Icons.directions_car),
+                  title: const Text('My Rides', style: TextStyle(fontSize: 16)),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyRidesScreen(),
+                      ),
+                    );
+                  },
+                ),
 
               // Dark Mode
               ValueListenableBuilder<bool>(
@@ -226,283 +360,262 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       // Home Body
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Welcome!',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
+      body: RefreshIndicator(
+        onRefresh: _loadUpcomingRide,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Welcome!',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              ),
 
-            const SizedBox(height: 5),
+              const SizedBox(height: 5),
 
-            Text(
-              'What would you like to do today?',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
+              Text(
+                'What would you like to do today?',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
 
-            const SizedBox(height: 25),
+              const SizedBox(height: 25),
 
-            // Driver buttons
-            if (_user.isDriver) ...[
-              // Find a Driver
-              SizedBox(
-                width: double.infinity,
-                height: 65,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const FindDriverScreen(),
+              // Driver buttons
+              if (_user.isDriver) ...[
+                // Find a Driver
+                SizedBox(
+                  width: double.infinity,
+                  height: 65,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FindDriverScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.directions_car),
+                    label: const Text(
+                      'Find a Driver',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.directions_car),
-                  label: const Text(
-                    'Find a Driver',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 15),
+                const SizedBox(height: 15),
 
-              // Find a Passenger
-              SizedBox(
-                width: double.infinity,
-                height: 65,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const FindPassengerScreen(),
+                // Find a Passenger
+                SizedBox(
+                  width: double.infinity,
+                  height: 65,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FindPassengerScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person_search),
+                    label: const Text(
+                      'Find a Passenger',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.person_search),
-                  label: const Text(
-                    'Find a Passenger',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 15),
+                const SizedBox(height: 15),
 
-              // Create Rides
-              SizedBox(
-                width: double.infinity,
-                height: 65,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreateRideScreen(),
+                // Create Rides
+                SizedBox(
+                  width: double.infinity,
+                  height: 65,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CreateRideScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.add_road),
+                    label: const Text(
+                      'Create Rides',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.add_road),
-                  label: const Text(
-                    'Create Rides',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
-            ] else ...[
-              // Passenger - Find Rides
-              SizedBox(
-                width: double.infinity,
-                height: 65,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const FindDriverScreen(),
+              ] else ...[
+                // Passenger - Find Rides
+                SizedBox(
+                  width: double.infinity,
+                  height: 65,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FindDriverScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.search),
+                    label: const Text(
+                      'Find Rides',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.search),
-                  label: const Text(
-                    'Find Rides',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 30),
 
-            // Messages
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: colorScheme.outline.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
+              // Messages
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(18),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ChatsScreen(currentUserId: _user.userId.toString()),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      children: [
-                        // Message icon
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            Icons.chat_bubble_outline,
-                            color: colorScheme.primary,
-                            size: 24,
-                          ),
-                        ),
-
-                        const SizedBox(width: 14),
-
-                        // Message text
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Messages',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              SizedBox(height: 3),
-                              Text(
-                                'Your ride conversations',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Arrow
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 17),
-                      ],
-                    ),
+                  border: Border.all(
+                    color: colorScheme.outline.withValues(alpha: 0.2),
                   ),
                 ),
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Upcoming Ride information
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: colorScheme.outline.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Section title
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 20,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 9),
-                        const Text(
-                          'Upcoming Ride',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatsScreen(
+                            currentUserId: _user.userId.toString(),
                           ),
                         ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    // Empty ride state
-                    Center(
-                      child: Column(
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                      child: Row(
                         children: [
+                          // Message icon
                           Container(
-                            width: 50,
-                            height: 50,
+                            width: 46,
+                            height: 46,
                             decoration: BoxDecoration(
                               color: colorScheme.primary.withValues(
-                                alpha: 0.10,
+                                alpha: 0.12,
                               ),
-                              shape: BoxShape.circle,
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: Icon(
-                              Icons.directions_car_outlined,
+                              Icons.chat_bubble_outline,
                               color: colorScheme.primary,
-                              size: 26,
+                              size: 24,
                             ),
                           ),
 
-                          const SizedBox(height: 10),
+                          const SizedBox(width: 14),
 
+                          // Message text
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Messages',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Your ride conversations',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Arrow
+                          const Icon(Icons.arrow_forward_ios_rounded, size: 17),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Upcoming Ride information
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: colorScheme.outline.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Section title
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 9),
                           const Text(
-                            'No upcoming rides',
+                            'Upcoming Ride',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 17,
                               fontWeight: FontWeight.w600,
-                            ),
-                          ),
-
-                          const SizedBox(height: 3),
-
-                          Text(
-                            'Your next ride will appear here',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 18),
+
+                      // Upcoming ride (or empty state)
+                      _buildUpcomingRide(colorScheme),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

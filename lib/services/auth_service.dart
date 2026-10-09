@@ -193,6 +193,9 @@ class AuthService {
 
     final response = await http.Response.fromStream(streamedResponse);
 
+    print('PROFILE UPLOAD STATUS: ${response.statusCode}');
+    print('PROFILE UPLOAD RESPONSE: ${response.body}');
+
     final data = jsonDecode(response.body);
 
     if (response.statusCode == 200 && data['success'] == true) {
@@ -572,10 +575,6 @@ class AuthService {
     );
 
     if (response.statusCode == 200) {
-      print('========== AVAILABLE RIDES RAW RESPONSE ==========');
-      print(response.body);
-      print('===================================================');
-
       final data = jsonDecode(response.body);
 
       return List<Map<String, dynamic>>.from(data['rides'] ?? []);
@@ -626,5 +625,95 @@ class AuthService {
     }
 
     throw Exception(message);
+  }
+
+  // NEW: the next ride a driver has accepted the logged-in user on as a
+  // passenger. Backend endpoint: GET /api/rides/accepted
+  // Response: {"success": true, "ride": {...}} or {"success": true, "ride": null}
+  Future<Map<String, dynamic>?> getAcceptedRide() async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rides/accepted'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return data['ride'] as Map<String, dynamic>?;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      'Failed to load accepted ride. Server returned ${response.statusCode}.',
+    );
+  }
+
+  // NEW: all active rides created by the logged-in driver.
+  // Backend endpoint: GET /api/rides/mine
+  Future<List<Map<String, dynamic>>> getMyRides() async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rides/mine'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return List<Map<String, dynamic>>.from(data['rides'] ?? []);
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      'Failed to load your rides. Server returned ${response.statusCode}.',
+    );
+  }
+
+  // NEW: permanently deletes a ride the driver created.
+  // Backend endpoint: DELETE /api/rides/{rideId}
+  Future<void> deleteRide(int rideId) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/rides/$rideId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    if (response.statusCode == 403) {
+      throw Exception('You are not allowed to delete this ride.');
+    }
+
+    throw Exception(
+      'Failed to delete ride. Server returned ${response.statusCode}.',
+    );
   }
 }
