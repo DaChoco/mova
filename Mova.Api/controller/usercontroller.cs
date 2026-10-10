@@ -47,7 +47,7 @@ public class UserController : ControllerBase
             isDriver = user.IsDriver,
             carID = user.CarId,
             profileIcon = user.ProfileIcon != null
-                ? $"{Request.Scheme}://{Request.Host}/profilepicture/{user.ProfileIcon}"
+                ? user.ProfileIcon
                 : null
         }
     });
@@ -108,8 +108,7 @@ public class UserController : ControllerBase
     }
     [HttpPost("profile/upload")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadProfilePicture(
-    [FromForm] IFormFile file)
+    public async Task<IActionResult> UploadProfilePicture(IFormFile file)
     {
         var userIdClaim =
             User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -208,13 +207,13 @@ public class UserController : ControllerBase
                 url = profilePictureUrl
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Log the exception on the server in production
             return StatusCode(500, new
             {
                 success = false,
-                message = "Failed to upload profile picture."
+                message = "An error occurred while uploading the profile picture.",
             });
         }
     }
