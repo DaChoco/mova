@@ -1,12 +1,12 @@
-import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mova/config/app_config.dart';
 
-import 'models/auth.dart';
 import 'services/auth_service.dart';
+import 'services/route_service.dart';
 
 class FindDriverScreen extends StatefulWidget {
   const FindDriverScreen({super.key});
@@ -20,19 +20,22 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     baseUrl: AppConfig.backendBaseUrl,
   );
 
-  User? _currentUser;
+  final RouteService _routeService = RouteService();
 
   List<Map<String, dynamic>> _rides = [];
 
+  Position? _currentLocation;
+
   bool _isLoading = true;
+  bool _isGettingLocation = false;
+  bool _showAllRides = false;
+
+  static const double _nearbyRadiusKm = 5.0;
 
   int? _requestingRideId;
-
-  // The ride currently selected on the map.
   int? _selectedRideId;
 
   MapLibreMapController? _mapController;
-
   bool _mapStyleLoaded = false;
 
   @override
@@ -41,28 +44,180 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     _loadAvailableRides();
   }
 
-  Future<void> _loadAvailableRides() async {
+  // Calculates straight-line distance between two coordinates.
+  double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
+    const earthRadiusKm = 6371.0;
+
+    final latDifference = _degreesToRadians(lat2 - lat1);
+    final lonDifference = _degreesToRadians(lon2 - lon1);
+
+    final a =
+        math.sin(latDifference / 2) * math.sin(latDifference / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(lonDifference / 2) *
+            math.sin(lonDifference / 2);
+
+    final boundedA = a.clamp(0.0, 1.0);
+    final c = 2 * math.atan2(math.sqrt(boundedA), math.sqrt(1 - boundedA));
+
+    return earthRadiusKm * c;
+  }
+
+  double _degreesToRadians(double degrees) => degrees * math.pi / 180;
+
+  // Returns the distance from the passenger to a ride's pickup.
+  double? _getRideDistance(Map<String, dynamic> ride) {
+    final pickupLat = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
+    final pickupLon = double.tryParse(
+      ride['pickupLongitude']?.toString() ?? '',
+    );
+
+    final location = _currentLocation;
+
+    if (location == null || pickupLat == null || pickupLon == null) {
+      return null;
+    }
+
+    return _distanceKm(
+      location.latitude,
+      location.longitude,
+      pickupLat,
+      pickupLon,
+    );
+  }
+
+  // Shows rides within 5 km by default and sorts them by distance.
+  List<Map<String, dynamic>> get _visibleRides {
+    final rides = List<Map<String, dynamic>>.from(_rides);
+
+    if (_currentLocation == null) {
+      return rides;
+    }
+
+    if (!_showAllRides) {
+      rides.removeWhere((ride) {
+        final distance = _getRideDistance(ride);
+        return distance == null || distance > _nearbyRadiusKm;
+      });
+    }
+
+    rides.sort((a, b) {
+      final distanceA = _getRideDistance(a) ?? double.infinity;
+      final distanceB = _getRideDistance(b) ?? double.infinity;
+
+      return distanceA.compareTo(distanceB);
+    });
+
+    return rides;
+  }
+
+  // Requests permission and obtains the passenger's current GPS position.
+  Future<void> _useMyLocation() async {
+    if (_isGettingLocation) return;
+
     setState(() {
-      _isLoading = true;
+      _isGettingLocation = true;
     });
 
     try {
-      final user = await _authService.getUser();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
-      final rides = await _authService.getAvailableRides();
+      if (!serviceEnabled) {
+        throw Exception('Please enable Location Services on your phone.');
+      }
 
-      debugPrint('AVAILABLE RIDES: $rides');
+      var permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permission was denied.');
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception(
+          'Location permission is permanently denied. '
+          'Enable it in your phone settings.',
+        );
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
 
       if (!mounted) return;
 
       setState(() {
-        _currentUser = user;
-        _rides = rides;
-        _isLoading = false;
+        _currentLocation = position;
+        _showAllRides = false;
+        _selectedRideId = null;
       });
 
-      // Clear the previous selection when the rides are refreshed.
-      _selectedRideId = null;
+      await _addRideMarkers();
+
+      if (_mapController != null && _mapStyleLoaded) {
+        await _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(position.latitude, position.longitude),
+              zoom: 13,
+            ),
+          ),
+        );
+      }
+
+      if (!mounted) return;
+
+      final nearbyCount = _visibleRides.length;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nearbyCount == 0
+                ? 'No rides found within 5 km. Try showing all rides.'
+                : 'Found $nearbyCount ride(s) within 5 km.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGettingLocation = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadAvailableRides() async {
+    if (_isLoading && _rides.isEmpty) {
+      // Initial loading is already in progress.
+    } else {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final rides = await _authService.getAvailableRides();
+
+      if (!mounted) return;
+
+      setState(() {
+        _rides = rides;
+        _isLoading = false;
+        _selectedRideId = null;
+      });
 
       await _addRideMarkers();
     } catch (e) {
@@ -78,26 +233,64 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
-  /// Clears the existing map route/markers and displays
-  /// the route belonging to the currently selected ride.
+  // Displays the passenger, pickup points, destination and selected route.
   Future<void> _addRideMarkers() async {
     if (_mapController == null || !_mapStyleLoaded) {
       return;
     }
 
     try {
-      // Remove the previous driver's route and markers.
       await _mapController!.clearCircles();
       await _mapController!.clearLines();
 
-      // If no ride is selected, keep the map clear.
+      // Green marker: passenger's current location.
+      final location = _currentLocation;
+
+      if (location != null) {
+        await _mapController!.addCircle(
+          CircleOptions(
+            geometry: LatLng(location.latitude, location.longitude),
+            circleRadius: 10,
+            circleColor: '#0F6E56',
+            circleOpacity: 1,
+            circleStrokeWidth: 3,
+            circleStrokeColor: '#FFFFFF',
+          ),
+        );
+      }
+
+      // Blue markers: pickup points in the current search results.
+      for (final ride in _visibleRides) {
+        final pickupLat = double.tryParse(
+          ride['pickupLatitude']?.toString() ?? '',
+        );
+        final pickupLon = double.tryParse(
+          ride['pickupLongitude']?.toString() ?? '',
+        );
+
+        if (pickupLat == null || pickupLon == null) {
+          continue;
+        }
+
+        await _mapController!.addCircle(
+          CircleOptions(
+            geometry: LatLng(pickupLat, pickupLon),
+            circleRadius: 7,
+            circleColor: '#0000FF',
+            circleOpacity: 1,
+            circleStrokeWidth: 2,
+            circleStrokeColor: '#FFFFFF',
+          ),
+        );
+      }
+
       if (_selectedRideId == null) {
         return;
       }
 
       Map<String, dynamic>? selectedRide;
 
-      for (final ride in _rides) {
+      for (final ride in _visibleRides) {
         final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
         if (rideId == _selectedRideId) {
@@ -110,184 +303,151 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         return;
       }
 
-      final pickupLatitude = double.tryParse(
+      final pickupLat = double.tryParse(
         selectedRide['pickupLatitude']?.toString() ?? '',
       );
-
-      final pickupLongitude = double.tryParse(
+      final pickupLon = double.tryParse(
         selectedRide['pickupLongitude']?.toString() ?? '',
       );
-
-      final destinationLatitude = double.tryParse(
+      final destinationLat = double.tryParse(
         selectedRide['destinationLatitude']?.toString() ?? '',
       );
-
-      final destinationLongitude = double.tryParse(
+      final destinationLon = double.tryParse(
         selectedRide['destinationLongitude']?.toString() ?? '',
       );
 
-      // BLUE DOT = pickup location
-      if (pickupLatitude != null && pickupLongitude != null) {
+      // Red marker: destination.
+      if (destinationLat != null && destinationLon != null) {
         await _mapController!.addCircle(
           CircleOptions(
-            geometry: LatLng(pickupLatitude, pickupLongitude),
-            circleRadius: 9,
-            circleColor: '#0000FF',
-            circleOpacity: 1.0,
-            circleStrokeWidth: 3,
-            circleStrokeColor: '#FFFFFF',
-          ),
-        );
-      }
-
-      // RED DOT = destination
-      if (destinationLatitude != null && destinationLongitude != null) {
-        await _mapController!.addCircle(
-          CircleOptions(
-            geometry: LatLng(destinationLatitude, destinationLongitude),
+            geometry: LatLng(destinationLat, destinationLon),
             circleRadius: 9,
             circleColor: '#FF0000',
-            circleOpacity: 1.0,
+            circleOpacity: 1,
             circleStrokeWidth: 3,
             circleStrokeColor: '#FFFFFF',
           ),
         );
       }
 
-      // Draw the selected ride's OSRM route.
-      if (pickupLatitude != null &&
-          pickupLongitude != null &&
-          destinationLatitude != null &&
-          destinationLongitude != null) {
+      if (pickupLat != null &&
+          pickupLon != null &&
+          destinationLat != null &&
+          destinationLon != null) {
         await _drawRoute(
-          pickupLatitude: pickupLatitude,
-          pickupLongitude: pickupLongitude,
-          destinationLatitude: destinationLatitude,
-          destinationLongitude: destinationLongitude,
+          pickupLatitude: pickupLat,
+          pickupLongitude: pickupLon,
+          destinationLatitude: destinationLat,
+          destinationLongitude: destinationLon,
         );
       }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not load map route: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not update map: $e')));
     }
   }
 
-  /// Selects a ride and displays its route on the map.
-  ///
-  /// Selecting another ride automatically clears the
-  /// previous route and displays the new one.
   Future<void> _selectRide(Map<String, dynamic> ride) async {
     final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
-    if (rideId == null) {
-      return;
-    }
+    if (rideId == null) return;
 
     setState(() {
       _selectedRideId = rideId;
     });
 
-    // Clear old route/markers and draw the new route.
     await _addRideMarkers();
 
-    final pickupLatitude = double.tryParse(
-      ride['pickupLatitude']?.toString() ?? '',
-    );
-
-    final pickupLongitude = double.tryParse(
+    final pickupLat = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
+    final pickupLon = double.tryParse(
       ride['pickupLongitude']?.toString() ?? '',
     );
 
-    // Move the map to the selected driver's pickup location.
-    if (pickupLatitude != null && pickupLongitude != null) {
-      await _mapController?.animateCamera(
+    if (pickupLat != null &&
+        pickupLon != null &&
+        _mapController != null &&
+        _mapStyleLoaded) {
+      await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(pickupLatitude, pickupLongitude),
-            zoom: 13,
-          ),
+          CameraPosition(target: LatLng(pickupLat, pickupLon), zoom: 13),
         ),
       );
     }
   }
 
-  /// Gets the route from OSRM and draws it on MapLibre.
+  // Gets the route from the backend's OSRM integration.
   Future<void> _drawRoute({
     required double pickupLatitude,
     required double pickupLongitude,
     required double destinationLatitude,
     required double destinationLongitude,
   }) async {
-    if (_mapController == null || !_mapStyleLoaded) {
-      return;
-    }
+    if (_mapController == null || !_mapStyleLoaded) return;
 
     try {
-      final url =
-          'https://router.project-osrm.org/route/v1/driving/'
-          '$pickupLongitude,$pickupLatitude;'
-          '$destinationLongitude,$destinationLatitude'
-          '?overview=full&geometries=geojson';
+      final route = await _routeService.getRoute(
+        startLat: pickupLatitude,
+        startLon: pickupLongitude,
+        endLat: destinationLatitude,
+        endLon: destinationLongitude,
+      );
 
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode != 200) {
-        throw Exception('OSRM returned status ${response.statusCode}');
+      if (!mounted || _mapController == null || !_mapStyleLoaded) {
+        return;
       }
 
-      final data = jsonDecode(response.body);
-
-      if (data['code'] != 'Ok') {
-        throw Exception('OSRM could not find a route.');
-      }
-
-      final routes = data['routes'];
-
-      if (routes == null || routes.isEmpty) {
-        throw Exception('No route was found.');
-      }
-
-      final coordinates = routes[0]['geometry']['coordinates'] as List;
-
-      final routePoints = coordinates.map<LatLng>((coordinate) {
-        final longitude = (coordinate[0] as num).toDouble();
-
-        final latitude = (coordinate[1] as num).toDouble();
-
-        return LatLng(latitude, longitude);
+      final routePoints = route.coordinates.map((coordinate) {
+        // OSRM returns [longitude, latitude].
+        return LatLng(coordinate[1], coordinate[0]);
       }).toList();
 
       if (routePoints.isEmpty) {
-        return;
+        throw Exception('The route contains no coordinates.');
       }
 
       await _mapController!.addLine(
         LineOptions(
           geometry: routePoints,
           lineColor: '#0F6E56',
-          lineWidth: 5.0,
+          lineWidth: 5,
           lineOpacity: 0.9,
           lineJoin: 'round',
+        ),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Route: ${route.distanceKm.toStringAsFixed(1)} km · '
+            '${route.durationMinutes.toStringAsFixed(0)} min',
+          ),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not load route: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load route: '
+            '${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
     }
   }
 
   Future<void> _requestRide(Map<String, dynamic> ride) async {
-    final rideId = int.tryParse(ride['rideId'].toString());
+    final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
     if (rideId == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Invalid ride ID.')));
-
       return;
     }
 
@@ -321,9 +481,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
   }
 
   String _formatScheduledTime(dynamic scheduledFor) {
-    if (scheduledFor == null) {
-      return 'Unknown time';
-    }
+    if (scheduledFor == null) return 'Unknown time';
 
     try {
       final date = DateTime.parse(scheduledFor.toString()).toLocal();
@@ -331,7 +489,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       final day = date.day.toString().padLeft(2, '0');
       final month = date.month.toString().padLeft(2, '0');
       final year = date.year.toString();
-
       final hour = date.hour.toString().padLeft(2, '0');
       final minute = date.minute.toString().padLeft(2, '0');
 
@@ -342,15 +499,11 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
   }
 
   String _formatFare(dynamic estimatedFare) {
-    if (estimatedFare == null) {
-      return 'Not available';
-    }
+    if (estimatedFare == null) return 'Not available';
 
     final fare = double.tryParse(estimatedFare.toString());
 
-    if (fare == null) {
-      return 'Not available';
-    }
+    if (fare == null) return 'Not available';
 
     return 'R${fare.toStringAsFixed(2)}';
   }
@@ -367,6 +520,17 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            onPressed: _isGettingLocation ? null : _useMyLocation,
+            tooltip: 'Use my location',
+            icon: _isGettingLocation
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location),
+          ),
           IconButton(
             onPressed: _isLoading ? null : _loadAvailableRides,
             icon: const Icon(Icons.refresh),
@@ -389,15 +553,27 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         zoom: 11,
       ),
       styleString: 'https://tiles.openfreemap.org/styles/bright',
-
       onMapCreated: (controller) {
         _mapController = controller;
       },
-
       onStyleLoadedCallback: () async {
         _mapStyleLoaded = true;
-
         await _addRideMarkers();
+
+        // If GPS was obtained before the map finished loading,
+        // centre the map on the passenger once the map is ready.
+        final location = _currentLocation;
+
+        if (location != null && mounted) {
+          await _mapController?.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(location.latitude, location.longitude),
+                zoom: 13,
+              ),
+            ),
+          );
+        }
       },
     );
   }
@@ -406,7 +582,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     return Stack(
       children: [
         Positioned.fill(child: _buildMap()),
-
         Align(
           alignment: Alignment.bottomCenter,
           child: Container(
@@ -433,16 +608,12 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   size: 60,
                   color: colorScheme.onSurfaceVariant,
                 ),
-
                 const SizedBox(height: 15),
-
                 const Text(
                   'No Rides Available',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 8),
-
                 Text(
                   'There are currently no available rides. '
                   'Check again later.',
@@ -452,9 +623,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                     fontSize: 15,
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -462,6 +631,16 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                     onPressed: _loadAvailableRides,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Search Again'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _isGettingLocation ? null : _useMyLocation,
+                    icon: const Icon(Icons.my_location),
+                    label: const Text('Use My Location'),
                   ),
                 ),
               ],
@@ -473,10 +652,11 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
   }
 
   Widget _buildRideContent(ColorScheme colorScheme) {
+    final visibleRides = _visibleRides;
+
     return Stack(
       children: [
         Positioned.fill(child: _buildMap()),
-
         DraggableScrollableSheet(
           initialChildSize: 0.48,
           minChildSize: 0.25,
@@ -517,20 +697,39 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                       ),
                     ),
                   ),
-
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Available Rides',
-                          style: TextStyle(
-                            fontSize: 21,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            _currentLocation != null && !_showAllRides
+                                ? 'Nearby Rides'
+                                : 'Available Rides',
+                            style: const TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-
+                        TextButton(
+                          onPressed: _currentLocation == null
+                              ? _useMyLocation
+                              : () async {
+                                  setState(() {
+                                    _showAllRides = !_showAllRides;
+                                    _selectedRideId = null;
+                                  });
+                                  await _addRideMarkers();
+                                },
+                          child: Text(
+                            _currentLocation == null
+                                ? 'Use GPS'
+                                : _showAllRides
+                                ? 'Nearby only'
+                                : 'Show all',
+                          ),
+                        ),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -541,7 +740,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_rides.length}',
+                            '${visibleRides.length}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.primary,
@@ -551,9 +750,59 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                       ],
                     ),
                   ),
-
-                  ..._rides.map((ride) => _buildRideCard(context, ride)),
-
+                  if (_currentLocation != null && !_showAllRides)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Text(
+                        'Showing rides within 5 km of your location.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  if (visibleRides.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 42,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              _currentLocation == null
+                                  ? 'No rides are currently available.'
+                                  : 'No rides found within 5 km. '
+                                        'Try "Show all" to see other rides.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (_currentLocation != null && !_showAllRides) ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton(
+                                onPressed: () async {
+                                  setState(() {
+                                    _showAllRides = true;
+                                  });
+                                  await _addRideMarkers();
+                                },
+                                child: const Text('Show all rides'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ...visibleRides.map(
+                      (ride) => _buildRideCard(context, ride),
+                    ),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -567,22 +816,18 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
   Widget _buildRideCard(BuildContext context, Map<String, dynamic> ride) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final rideId = int.tryParse(ride['rideId'].toString());
+    final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
     final isRequesting = rideId != null && _requestingRideId == rideId;
-
     final isSelected = rideId != null && _selectedRideId == rideId;
 
     final pickup = ride['pickupAddress']?.toString() ?? 'Unknown pickup';
-
     final destination =
         ride['destinationAddress']?.toString() ?? 'Unknown destination';
-
     final seats = ride['availableSeats']?.toString() ?? 'Unknown';
-
     final scheduled = _formatScheduledTime(ride['scheduledFor']);
-
     final fare = _formatFare(ride['estimatedFare']);
+    final distance = _getRideDistance(ride);
 
     return Card(
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
@@ -596,9 +841,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          _selectRide(ride);
-        },
+        onTap: () => _selectRide(ride),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -614,9 +857,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                       color: colorScheme.onPrimaryContainer,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   const Expanded(
                     child: Text(
                       'Driver',
@@ -626,7 +867,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                       ),
                     ),
                   ),
-
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -638,7 +878,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                           color: colorScheme.primary,
                         ),
                       ),
-
                       const Text(
                         'estimated fare',
                         style: TextStyle(fontSize: 11),
@@ -647,9 +886,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -658,9 +895,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                     size: 21,
                     color: colorScheme.primary,
                   ),
-
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,18 +907,14 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(height: 2),
-
                         Text(pickup, style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
                 ],
               ),
-
               const SizedBox(height: 10),
-
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -692,9 +923,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                     size: 21,
                     color: colorScheme.primary,
                   ),
-
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,18 +935,35 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(height: 2),
-
                         Text(destination, style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
                 ],
               ),
-
+              if (distance != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.near_me_outlined,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${distance.toStringAsFixed(1)} km from your location',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 14),
-
               Row(
                 children: [
                   Expanded(
@@ -727,9 +973,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                       colorScheme: colorScheme,
                     ),
                   ),
-
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: _buildDetail(
                       icon: Icons.people_outline,
@@ -739,9 +983,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
-
               Text(
                 isSelected
                     ? 'Route currently shown on the map'
@@ -754,18 +996,12 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
-
               const SizedBox(height: 12),
-
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: isRequesting
-                      ? null
-                      : () {
-                          _requestRide(ride);
-                        },
+                  onPressed: isRequesting ? null : () => _requestRide(ride),
                   icon: isRequesting
                       ? const SizedBox(
                           width: 19,
@@ -791,9 +1027,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     return Row(
       children: [
         Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-
         const SizedBox(width: 6),
-
         Expanded(
           child: Text(
             text,

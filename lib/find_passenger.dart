@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mova/config/app_config.dart';
+import 'package:mova/services/route_service.dart';
 
 import 'message_screen.dart';
 import 'models/auth.dart';
@@ -17,6 +18,12 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   final AuthService _authService = AuthService(
     baseUrl: AppConfig.backendBaseUrl,
   );
+
+  final RouteService _routeService = RouteService();
+
+  MapLibreMapController? _mapController;
+
+  bool _mapStyleLoaded = false;
 
   User? _currentUser;
 
@@ -308,6 +315,13 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
               zoom: 11,
             ),
             styleString: 'https://tiles.openfreemap.org/styles/bright',
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
+            onStyleLoadedCallback: () {
+              _mapStyleLoaded = true;
+              _drawActiveRideRoute();
+            },
           ),
         ),
 
@@ -523,6 +537,107 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _drawActiveRideRoute() async {
+    final ride = _activeRide;
+    final controller = _mapController;
+
+    if (ride == null || controller == null || !_mapStyleLoaded) {
+      return;
+    }
+
+    final pickupLat = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
+    final pickupLon = double.tryParse(
+      ride['pickupLongitude']?.toString() ?? '',
+    );
+    final destinationLat = double.tryParse(
+      ride['destinationLatitude']?.toString() ?? '',
+    );
+    final destinationLon = double.tryParse(
+      ride['destinationLongitude']?.toString() ?? '',
+    );
+
+    if (pickupLat == null ||
+        pickupLon == null ||
+        destinationLat == null ||
+        destinationLon == null) {
+      debugPrint('Active ride is missing valid route coordinates.');
+      return;
+    }
+
+    try {
+      await controller.clearCircles();
+      await controller.clearLines();
+
+      final route = await _routeService.getRoute(
+        startLat: pickupLat,
+        startLon: pickupLon,
+        endLat: destinationLat,
+        endLon: destinationLon,
+      );
+
+      if (!mounted || _mapController != controller || !_mapStyleLoaded) {
+        return;
+      }
+
+      final points = route.coordinates.map((coordinate) {
+        return LatLng(coordinate[1], coordinate[0]);
+      }).toList();
+
+      if (points.isEmpty) {
+        throw Exception('The route contains no coordinates.');
+      }
+
+      await controller.addCircle(
+        CircleOptions(
+          geometry: LatLng(pickupLat, pickupLon),
+          circleRadius: 9,
+          circleColor: '#0000FF',
+          circleStrokeWidth: 3,
+          circleStrokeColor: '#FFFFFF',
+        ),
+      );
+
+      await controller.addCircle(
+        CircleOptions(
+          geometry: LatLng(destinationLat, destinationLon),
+          circleRadius: 9,
+          circleColor: '#FF0000',
+          circleStrokeWidth: 3,
+          circleStrokeColor: '#FFFFFF',
+        ),
+      );
+
+      await controller.addLine(
+        LineOptions(
+          geometry: points,
+          lineColor: '#0F6E56',
+          lineWidth: 5,
+          lineOpacity: 0.9,
+          lineJoin: 'round',
+        ),
+      );
+
+      debugPrint(
+        'Active ride route loaded: '
+        '${route.distanceKm.toStringAsFixed(1)} km, '
+        '${route.durationMinutes.toStringAsFixed(0)} minutes.',
+      );
+    } catch (e) {
+      debugPrint('Could not load active ride route: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load route: '
+            '${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildPassengerCard(
