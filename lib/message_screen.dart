@@ -99,7 +99,21 @@ class _MessageScreenState extends State<MessageScreen> {
           _displayName = fullName;
         }
 
-        _profileImageUrl = user['profileIcon']?.toString();
+        final profileIcon = user['profileIcon']?.toString().trim();
+
+        setState(() {
+          if (fullName.isNotEmpty) {
+            _displayName = fullName;
+          }
+
+          if (profileIcon != null && profileIcon.isNotEmpty) {
+            _profileImageUrl = profileIcon.startsWith('http')
+                ? profileIcon
+                : 'https://zeedqugdftxrbscmhgmq.supabase.co/storage/v1/object/public/user-icons/$profileIcon';
+          } else {
+            _profileImageUrl = null;
+          }
+        });
       });
     } catch (e) {
       // Keep the name passed into the screen.
@@ -147,14 +161,33 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   Widget _profileAvatar() {
-    if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 20,
-        backgroundImage: NetworkImage(_profileImageUrl!),
-      );
+    final imageUrl = _profileImageUrl?.trim();
+
+    if (imageUrl == null ||
+        imageUrl.isEmpty ||
+        !(imageUrl.startsWith('https://') || imageUrl.startsWith('http://'))) {
+      return const CircleAvatar(radius: 20, child: Icon(Icons.person));
     }
 
-    return const CircleAvatar(radius: 20, child: Icon(Icons.person));
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Colors.grey.shade300,
+      child: ClipOval(
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('Failed to load chat profile image: $error');
+
+              return const Center(child: Icon(Icons.person));
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _messageBubble(chat.Message message) {

@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+
 import 'config/app_config.dart';
 import '../services/auth_service.dart';
 
@@ -14,6 +17,17 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   final TextEditingController _startLocationController =
       TextEditingController();
 
+  // Eduvos Tygervalley
+  static const LatLng _destinationLocation = LatLng(-33.8709, 18.6402);
+
+  static const String _destination =
+      'Eduvos Tygervalley, 9 Rogers St, Tyger Valley';
+
+  // Read-only destination field controller (created once, disposed below)
+  final TextEditingController _destinationController = TextEditingController(
+    text: _destination,
+  );
+
   final AuthService _authService = AuthService(
     baseUrl: AppConfig.backendBaseUrl,
   );
@@ -27,15 +41,14 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
 
   bool _isCreatingRide = false;
 
-  // Eduvos Tygervalley
-  static const LatLng _destinationLocation = LatLng(-33.8709, 18.6402);
-
-  static const String _destination =
-      'Eduvos Tygervalley, 9 Rogers St, Tyger Valley';
+  // Map marker state
+  MapLibreMapController? _mapController;
+  Circle? _pickupCircle;
 
   @override
   void dispose() {
     _startLocationController.dispose();
+    _destinationController.dispose();
     super.dispose();
   }
 
@@ -71,10 +84,28 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
-  void _selectPickupLocation(LatLng coordinates) {
+  Future<void> _selectPickupLocation(LatLng coordinates) async {
     setState(() {
       _pickupLocation = coordinates;
     });
+
+    final controller = _mapController;
+    if (controller != null) {
+      if (_pickupCircle != null) {
+        await controller.removeCircle(_pickupCircle!);
+      }
+      _pickupCircle = await controller.addCircle(
+        CircleOptions(
+          geometry: coordinates,
+          circleRadius: 9,
+          circleColor: '#E53935',
+          circleStrokeColor: '#FFFFFF',
+          circleStrokeWidth: 3,
+        ),
+      );
+    }
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -247,20 +278,16 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                       ),
                       styleString:
                           'https://tiles.openfreemap.org/styles/bright',
+                      onMapCreated: (controller) => _mapController = controller,
                       onMapClick: (point, coordinates) {
                         _selectPickupLocation(coordinates);
                       },
-                    ),
-
-                    // Centre pin
-                    const IgnorePointer(
-                      child: Center(
-                        child: Icon(
-                          Icons.location_pin,
-                          size: 45,
-                          color: Colors.red,
+                      // Let the map win drag gestures inside the scroll view
+                      gestureRecognizers: {
+                        Factory<OneSequenceGestureRecognizer>(
+                          () => EagerGestureRecognizer(),
                         ),
-                      ),
+                      },
                     ),
 
                     // Selected coordinates
@@ -310,7 +337,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
             const SizedBox(height: 8),
 
             TextField(
-              controller: TextEditingController(text: _destination),
+              controller: _destinationController,
               enabled: false,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.school_outlined),

@@ -38,6 +38,9 @@ class _ChatListState extends State<ChatList> {
 
   late Future<List<chat.Conversation>> _chats;
 
+  // Cache profile image URLs to avoid repeatedly requesting the same user.
+  final Map<int, Future<String?>> _profileImageCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -50,16 +53,49 @@ class _ChatListState extends State<ChatList> {
   @override
   void dispose() {
     chat.chatsChanged.removeListener(_reload);
-
     super.dispose();
   }
 
   void _reload() {
-    if (mounted) {
-      setState(() {
-        _chats = _service.getConversations();
-      });
+    if (!mounted) return;
+
+    setState(() {
+      _chats = _service.getConversations();
+    });
+  }
+
+  String? _profileImageUrl(String? path) {
+    final value = path?.trim();
+
+    if (value == null || value.isEmpty || value == 'null') {
+      return null;
     }
+
+    if (value.startsWith('https://') || value.startsWith('http://')) {
+      return value;
+    }
+
+    return 'https://zeedqugdftxrbscmhgmq.supabase.co'
+        '/storage/v1/object/public/user-icons/$value';
+  }
+
+  Future<String?> _loadProfileImage(int userId) async {
+    try {
+      final user = await _service.getUser(userId.toString());
+
+      return _profileImageUrl(user['profileIcon']?.toString());
+    } catch (e) {
+      debugPrint('Could not load profile image for user $userId: $e');
+
+      return null;
+    }
+  }
+
+  Future<String?> _getProfileImage(int userId) {
+    return _profileImageCache.putIfAbsent(
+      userId,
+      () => _loadProfileImage(userId),
+    );
   }
 
   String _time(DateTime t) {
@@ -79,6 +115,39 @@ class _ChatListState extends State<ChatList> {
     return days == 1 ? 'Yesterday' : '${t.day}/${t.month}/${t.year}';
   }
 
+  Widget _chatAvatar(int userId) {
+    return FutureBuilder<String?>(
+      future: _getProfileImage(userId),
+      builder: (context, snapshot) {
+        final imageUrl = snapshot.data;
+
+        if (imageUrl == null || imageUrl.isEmpty) {
+          return const CircleAvatar(radius: 26, child: Icon(Icons.person));
+        }
+
+        return CircleAvatar(
+          radius: 26,
+          backgroundColor: Colors.grey.shade300,
+          child: ClipOval(
+            child: SizedBox(
+              width: 52,
+              height: 52,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  debugPrint('Failed to display chat profile image: $error');
+
+                  return const Center(child: Icon(Icons.person));
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -91,23 +160,20 @@ class _ChatListState extends State<ChatList> {
         }
 
         if (snap.hasError) {
-  debugPrint('[ChatList] Failed to load chats');
-  debugPrint('Error: ${snap.error}');
-  debugPrint('Stack trace:\n${snap.stackTrace}');
+          debugPrint('[ChatList] Failed to load chats');
+          debugPrint('Error: ${snap.error}');
+          debugPrint('Stack trace:\n${snap.stackTrace}');
 
-  return Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text('Could not load chats'),
-        TextButton(
-          onPressed: _reload,
-          child: const Text('Retry'),
-        ),
-      ],
-    ),
-  );
-}
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Could not load chats'),
+                TextButton(onPressed: _reload, child: const Text('Retry')),
+              ],
+            ),
+          );
+        }
 
         final all = snap.data ?? [];
 
@@ -143,7 +209,10 @@ class _ChatListState extends State<ChatList> {
 
         return RefreshIndicator(
           onRefresh: () async {
-            _reload();
+            setState(() {
+              _chats = _service.getConversations();
+              _profileImageCache.clear();
+            });
 
             await _chats.catchError((_) => <chat.Conversation>[]);
           },
@@ -161,10 +230,7 @@ class _ChatListState extends State<ChatList> {
                   vertical: 6,
                 ),
 
-                leading: const CircleAvatar(
-                  radius: 26,
-                  child: Icon(Icons.person),
-                ),
+                leading: _chatAvatar(c.otherUserId),
 
                 title: Text(
                   c.otherUserName,
