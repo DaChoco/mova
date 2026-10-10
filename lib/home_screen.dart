@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+
 import 'config/app_config.dart';
 import 'profile_screen.dart';
 import 'main.dart';
@@ -43,7 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Load the profile picture as soon as the home screen starts,
     // so the drawer shows it without opening the profile screen first.
     if (_user.profileIcon != null && _user.profileIcon!.isNotEmpty) {
-      String profileURL = '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
+      String profileURL =
+          '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
       print(profileURL);
       loadProfileImage(profileURL);
     } else {
