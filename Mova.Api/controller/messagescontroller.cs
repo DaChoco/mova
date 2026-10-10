@@ -118,6 +118,57 @@ public class MessagesController : ControllerBase
         });
     }
 
+    // NEW: marks every message sent by someone else in this ride as read.
+    // Called when the user opens the conversation.
+    // PATCH /api/rides/{rideId}/messages/read
+    [HttpPatch("read")]
+    public async Task<IActionResult> MarkRideAsRead(string rideId)
+    {
+        var currentUserIdValue =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (!int.TryParse(currentUserIdValue, out var currentUserId))
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Invalid user ID."
+            });
+        }
+
+        if (!int.TryParse(rideId, out var rideNumber))
+        {
+            return BadRequest(new { success = false, message = "Invalid ride ID." });
+        }
+
+        // Only the driver or an accepted passenger may read this chat.
+        var isParticipant =
+            await _db.Rides.AnyAsync(r => r.RideId == rideNumber && r.DriverId == currentUserId)
+            || await _db.RideRequests.AnyAsync(rr =>
+                rr.RideId == rideNumber &&
+                rr.PassengerId == currentUserId &&
+                rr.Status == "accepted");
+
+        if (!isParticipant)
+        {
+            return Forbid();
+        }
+
+        var filter = Builders<MessageDocument>.Filter.And(
+            Builders<MessageDocument>.Filter.Eq(m => m.RideId, rideId),
+            Builders<MessageDocument>.Filter.Ne(m => m.SenderId, currentUserId),
+            Builders<MessageDocument>.Filter.Eq(m => m.IsRead, false)
+        );
+
+        var update = Builders<MessageDocument>.Update
+            .Set(m => m.IsRead, true);
+
+        var result = await _mongo.Messages.UpdateManyAsync(filter, update);
+
+        return Ok(new { success = true, updated = result.ModifiedCount });
+    }
+
 
     [HttpGet]
     [Route("/api/messages/mine")]
@@ -242,7 +293,10 @@ public async Task<IActionResult> GetMyChats()
             lastMessage = lastMessage.Message,
             lastMessageAt =
                 lastMessage.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            lastSenderType = lastMessage.SenderType
+            lastSenderType = lastMessage.SenderType,
+
+            // NEW: messages from other people in this ride that are still unread
+            unreadCount = group.Count(m => m.SenderId != currentUserId && !m.IsRead)
         });
     }
 
