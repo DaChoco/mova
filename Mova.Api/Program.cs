@@ -6,6 +6,7 @@ using Mova.Api.Data;
 using Mova.Api.Helpers;
 using Microsoft.Extensions.FileProviders;
 using DotNetEnv;
+using Mova.Api.Services;
 
 Env.Load(
     Path.Combine(Directory.GetCurrentDirectory(), ".env"),
@@ -30,6 +31,17 @@ builder.Services.AddOpenApi(options =>
 builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("MongoDB"));
 builder.Services.AddSingleton<MongoDbContext>();
 builder.Services.AddHttpClient<SupabaseStorageService>();
+
+builder.Services.AddHttpClient<OsrmService>(client =>
+{
+    var baseUrl = builder.Configuration["Osrm:BaseUrl"]
+        ?? "http://127.0.0.1:5001";
+
+    client.BaseAddress = new Uri(
+        baseUrl.TrimEnd('/') + "/");
+
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
