@@ -7,8 +7,15 @@ using Mova.Api.Helpers;
 using Microsoft.Extensions.FileProviders;
 using DotNetEnv;
 
-Env.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+Env.Load(
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+    new DotNetEnv.LoadOptions(
+        setEnvVars: true,
+        clobberExistingVars: false
+    )
+);
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddEnvironmentVariables();
 
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
