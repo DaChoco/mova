@@ -209,7 +209,7 @@ class AuthService {
         return returnedUrl;
       }
 
-      return  returnedUrl;
+      return returnedUrl;
     }
 
     if (response.statusCode == 400) {
@@ -714,6 +714,34 @@ class AuthService {
 
     throw Exception(
       'Failed to delete ride. Server returned ${response.statusCode}.',
+    );
+  }
+
+  Future<Map<String, dynamic>> getUserProfile(int userId) async {
+    final token = await storage.read(key: 'jwt');
+
+    if (token == null) {
+      throw Exception('No login session found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/user/$userId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      return Map<String, dynamic>.from(data['user']);
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your login session has expired.');
+    }
+
+    throw Exception(
+      'Failed to load user profile. '
+      'Server returned ${response.statusCode}.',
     );
   }
 }

@@ -3,6 +3,44 @@ import 'package:flutter/material.dart';
 import 'message_screen.dart';
 import 'services/chat_service.dart' as chat;
 
+// Small count bubble. Shows nothing when there are no unread messages.
+// Also used on the home screen's Messages button.
+class UnreadBadge extends StatelessWidget {
+  final int count;
+
+  const UnreadBadge({super.key, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // No `alignment` on the Container: it would make the badge expand to the
+    // full width available, which breaks ListTile's trailing slot.
+    return Container(
+      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          style: TextStyle(
+            color: colorScheme.onPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ChatsScreen extends StatelessWidget {
   final String currentUserId;
 
@@ -247,9 +285,21 @@ class _ChatListState extends State<ChatList> {
                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
 
-                trailing: Text(
-                  _time(c.updatedAt),
-                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                // Time, with the unread count underneath
+                trailing: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _time(c.updatedAt),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                    if (c.unreadCount > 0) ...[
+                      const SizedBox(height: 6),
+                      UnreadBadge(count: c.unreadCount),
+                    ],
+                  ],
                 ),
 
                 onTap: () {

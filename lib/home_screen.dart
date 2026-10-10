@@ -11,6 +11,7 @@ import 'find_passenger.dart';
 import 'chat_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
+import 'services/chat_service.dart' as chat;
 import 'login_screen.dart';
 import 'create_ride.dart';
 import 'my_rides.dart';
@@ -31,8 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
     baseUrl: AppConfig.backendBaseUrl,
   );
 
+  final chat.ChatService _chatService = chat.ChatService();
+
   Map<String, dynamic>? _upcomingRide;
   bool _isLoadingRide = true;
+  int _unreadMessages = 0;
   Timer? _rideRefreshTimer;
 
   @override
@@ -55,17 +59,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     _loadUpcomingRide();
+    _loadUnreadMessages();
 
-    // The driver accepts requests on another device, so poll for changes.
-    _rideRefreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _loadUpcomingRide(),
-    );
+    // Refresh the unread badge whenever a message is sent or read.
+    chat.chatsChanged.addListener(_loadUnreadMessages);
+
+    // The driver accepts requests and messages arrive on other devices,
+    // so poll for changes.
+    _rideRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadUpcomingRide();
+      _loadUnreadMessages();
+    });
   }
 
   @override
   void dispose() {
     _rideRefreshTimer?.cancel();
+    chat.chatsChanged.removeListener(_loadUnreadMessages);
     super.dispose();
   }
 
@@ -86,6 +96,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Keep the last known ride if a refresh fails.
       setState(() => _isLoadingRide = false);
+    }
+  }
+
+  // Total unread messages across all of the user's chats.
+  Future<void> _loadUnreadMessages() async {
+    try {
+      final total = await _chatService.getUnreadTotal();
+
+      if (!mounted) return;
+
+      setState(() => _unreadMessages = total);
+    } catch (_) {
+      // Keep the last known count if a refresh fails.
     }
   }
 
@@ -365,7 +388,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Home Body
       body: RefreshIndicator(
-        onRefresh: _loadUpcomingRide,
+        onRefresh: () =>
+            Future.wait([_loadUpcomingRide(), _loadUnreadMessages()]),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
@@ -513,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             currentUserId: _user.userId.toString(),
                           ),
                         ),
-                      );
+                      ).then((_) => _loadUnreadMessages());
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -564,6 +588,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                           ),
+
+                          // Unread message count
+                          if (_unreadMessages > 0) ...[
+                            UnreadBadge(count: _unreadMessages),
+                            const SizedBox(width: 10),
+                          ],
 
                           // Arrow
                           const Icon(Icons.arrow_forward_ios_rounded, size: 17),

@@ -9,7 +9,7 @@ import 'auth_service.dart';
 
 final _host = AppConfig.backendBaseUrl;
 
-// Bumped whenever a message is sent so chat lists reload themselves
+// Bumped whenever a message is sent or read so chat lists and badges reload
 final ValueNotifier<int> chatsChanged = ValueNotifier<int>(0);
 
 class Message {
@@ -35,6 +35,7 @@ class Conversation {
   final String rideId, otherUserName, lastMessage;
   final int otherUserId;
   final DateTime updatedAt;
+  final int unreadCount;
 
   Conversation({
     required this.rideId,
@@ -42,6 +43,7 @@ class Conversation {
     required this.otherUserName,
     required this.lastMessage,
     required this.updatedAt,
+    this.unreadCount = 0,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
@@ -51,6 +53,7 @@ class Conversation {
     lastMessage: json['lastMessage']?.toString() ?? '',
     updatedAt: DateTime.parse(json['sentAt'] ?? json['lastMessageAt'])
         .toLocal(),
+    unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -114,9 +117,34 @@ class ChatService {
           otherUserName: name,
           lastMessage: c.lastMessage,
           updatedAt: c.updatedAt,
+          unreadCount: c.unreadCount,
         );
       }),
     );
+  }
+
+  // NEW: total unread messages across all conversations (home badge).
+  Future<int> getUnreadTotal() async {
+    final chats = await getConversations();
+
+    return chats.fold<int>(0, (sum, c) => sum + c.unreadCount);
+  }
+
+  // NEW: marks the other participants' messages in this ride as read.
+  // Backend endpoint: PATCH /api/rides/{rideId}/messages/read
+  Future<void> markRideRead(String rideId) async {
+    try {
+      final res = await _call(
+        (h) => http.patch(
+          Uri.parse('$_host/api/rides/$rideId/messages/read'),
+          headers: h,
+        ),
+      );
+
+      if (res.statusCode == 200) chatsChanged.value++;
+    } catch (e) {
+      debugPrint('markRideRead failed for ride $rideId: $e');
+    }
   }
 
   Future<List<Message>> getMessages(String rideId) async {

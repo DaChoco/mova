@@ -21,16 +21,15 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
   final RouteService _routeService = RouteService();
 
+  final Map<int, String?> _passengerImageUrls = {};
+  final Set<int> _loadingPassengerImages = {};
+
   MapLibreMapController? _mapController;
 
   bool _mapStyleLoaded = false;
-
   User? _currentUser;
-
   Map<String, dynamic>? _activeRide;
-
   List<Map<String, dynamic>> _requests = [];
-
   bool _isLoading = true;
 
   @override
@@ -39,16 +38,90 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     _loadRideRequests();
   }
 
+  // ---------------------------------------------------------------
+  // PASSENGER PROFILE PICTURES
+  // ---------------------------------------------------------------
+
+  Future<void> _loadPassengerProfileImage(Map<String, dynamic> request) async {
+    final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
+
+    if (passengerId == null ||
+        _passengerImageUrls.containsKey(passengerId) ||
+        _loadingPassengerImages.contains(passengerId)) {
+      return;
+    }
+
+    _loadingPassengerImages.add(passengerId);
+
+    try {
+      final profile = await _authService.getUserProfile(passengerId);
+
+      final rawUrl =
+          (profile['profileIcon'] ??
+                  profile['profileicon'] ??
+                  profile['profileImage'] ??
+                  profile['profileImageUrl'] ??
+                  profile['profilePicture'] ??
+                  profile['profilePictureUrl'] ??
+                  profile['avatarUrl'])
+              ?.toString()
+              .trim();
+
+      String? imageUrl;
+
+      if (rawUrl != null && rawUrl.isNotEmpty && rawUrl != 'null') {
+        final uri = Uri.tryParse(rawUrl);
+
+        if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+          imageUrl = rawUrl;
+        } else if (rawUrl.startsWith('/')) {
+          imageUrl = Uri.parse(AppConfig.backendBaseUrl)
+              .resolve(rawUrl)
+              .toString();
+        } else {
+          imageUrl = Uri.parse(AppConfig.backendBaseUrl)
+              .resolve('/$rawUrl')
+              .toString();
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _passengerImageUrls[passengerId] = imageUrl;
+      });
+
+      debugPrint(
+        'Passenger $passengerId profile image: ${imageUrl ?? "No image uploaded"}',
+      );
+    } catch (e) {
+      debugPrint('Could not load passenger $passengerId profile: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _passengerImageUrls[passengerId] = null;
+      });
+    } finally {
+      _loadingPassengerImages.remove(passengerId);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // LOAD ACTIVE RIDE AND REQUESTS
+  // ---------------------------------------------------------------
+
   Future<void> _loadRideRequests() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final user = await _authService.getUser();
-
       final ride = await _authService.getActiveRide();
 
       if (!mounted) return;
 
-      // No active ride means there is nothing for the driver
-      // to manage yet.
       if (ride == null) {
         setState(() {
           _currentUser = user;
@@ -67,6 +140,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       }
 
       final requests = await _authService.getRideRequests(rideId);
+
+      debugPrint('PASSENGER REQUEST DATA: $requests');
 
       if (!mounted) return;
 
@@ -116,14 +191,16 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // ACCEPT OR REJECT PASSENGER
+  // ---------------------------------------------------------------
+
   Future<void> _acceptPassenger(Map<String, dynamic> request) async {
     final rideId = int.tryParse(_activeRide?['rideId'].toString() ?? '');
 
-    final passengerId = int.tryParse(request['passengerId'].toString());
+    final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
 
-    if (rideId == null || passengerId == null) {
-      return;
-    }
+    if (rideId == null || passengerId == null) return;
 
     try {
       await _authService.acceptPassenger(
@@ -149,11 +226,9 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   Future<void> _rejectPassenger(Map<String, dynamic> request) async {
     final rideId = int.tryParse(_activeRide?['rideId'].toString() ?? '');
 
-    final passengerId = int.tryParse(request['passengerId'].toString());
+    final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
 
-    if (rideId == null || passengerId == null) {
-      return;
-    }
+    if (rideId == null || passengerId == null) return;
 
     try {
       await _authService.rejectPassenger(
@@ -176,6 +251,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       );
     }
   }
+
+  // ---------------------------------------------------------------
+  // OPEN MESSAGES
+  // ---------------------------------------------------------------
 
   void _openMessageScreen(Map<String, dynamic> request) {
     if (_currentUser == null) {
@@ -213,6 +292,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // RIDE DATE
+  // ---------------------------------------------------------------
+
   String _formatRideDate() {
     if (_activeRide == null || _activeRide!['scheduledFor'] == null) {
       return 'Unknown date';
@@ -234,6 +317,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       return 'Unknown date';
     }
   }
+
+  // ---------------------------------------------------------------
+  // MAIN SCREEN
+  // ---------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -261,10 +348,6 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   }
 
   Widget _buildContent(ColorScheme colorScheme) {
-    // ---------------------------------------------------------------
-    // NO ACTIVE RIDE
-    // ---------------------------------------------------------------
-
     if (_activeRide == null) {
       return Center(
         child: Padding(
@@ -277,16 +360,12 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                 size: 70,
                 color: colorScheme.onSurfaceVariant,
               ),
-
               const SizedBox(height: 20),
-
               const Text(
                 'No Active Ride',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 10),
-
               Text(
                 'Create a ride first. Passenger requests '
                 'will appear here.',
@@ -304,10 +383,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
     return Stack(
       children: [
-        // -------------------------------------------------------------
         // MAP
-        // -------------------------------------------------------------
-
         Positioned.fill(
           child: MapLibreMap(
             initialCameraPosition: const CameraPosition(
@@ -325,9 +401,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
           ),
         ),
 
-        // -------------------------------------------------------------
         // BOTTOM SHEET
-        // -------------------------------------------------------------
         DraggableScrollableSheet(
           initialChildSize: 0.45,
           minChildSize: 0.25,
@@ -353,8 +427,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                 controller: scrollController,
                 padding: EdgeInsets.zero,
                 children: [
-                  // Drag handle
-                  Container(
+                  // DRAG HANDLE
+                  Padding(
                     padding: const EdgeInsets.only(top: 10, bottom: 5),
                     child: Center(
                       child: Container(
@@ -370,9 +444,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                     ),
                   ),
 
-                  // -------------------------------------------------
                   // RIDE INFORMATION
-                  // -------------------------------------------------
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                     child: Column(
@@ -385,28 +457,25 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(height: 12),
-
                         _buildRideInfo(
                           icon: Icons.location_on_outlined,
                           title: 'Pickup',
-                          value: _activeRide!['pickupAddress'] ?? 'Unknown',
+                          value:
+                              _activeRide!['pickupAddress']?.toString() ??
+                              'Unknown',
                           colorScheme: colorScheme,
                         ),
-
                         const SizedBox(height: 8),
-
                         _buildRideInfo(
                           icon: Icons.school_outlined,
                           title: 'Destination',
                           value:
-                              _activeRide!['destinationAddress'] ?? 'Unknown',
+                              _activeRide!['destinationAddress']?.toString() ??
+                              'Unknown',
                           colorScheme: colorScheme,
                         ),
-
                         const SizedBox(height: 8),
-
                         _buildRideInfo(
                           icon: Icons.access_time_outlined,
                           title: 'Scheduled',
@@ -419,22 +488,19 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
                   const Divider(height: 25),
 
-                  // -------------------------------------------------
                   // REQUEST HEADING
-                  // -------------------------------------------------
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'Passenger Requests',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 19,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -456,9 +522,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                     ),
                   ),
 
-                  // -------------------------------------------------
-                  // REQUESTS
-                  // -------------------------------------------------
+                  // REQUEST LIST
                   if (_requests.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(30),
@@ -469,9 +533,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                             size: 55,
                             color: colorScheme.onSurfaceVariant,
                           ),
-
                           const SizedBox(height: 12),
-
                           const Text(
                             'No passenger requests yet',
                             style: TextStyle(
@@ -479,9 +541,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-
                           const SizedBox(height: 6),
-
                           Text(
                             'Passenger requests will appear here '
                             'when someone wants to join your ride.',
@@ -508,6 +568,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // RIDE INFORMATION ROW
+  // ---------------------------------------------------------------
+
   Widget _buildRideInfo({
     required IconData icon,
     required String title,
@@ -518,9 +582,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 20, color: colorScheme.primary),
-
         const SizedBox(width: 10),
-
         Expanded(
           child: RichText(
             text: TextSpan(
@@ -538,6 +600,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       ],
     );
   }
+
+  // ---------------------------------------------------------------
+  // DRAW ACTIVE RIDE ROUTE
+  // ---------------------------------------------------------------
 
   Future<void> _drawActiveRideRoute() async {
     final ride = _activeRide;
@@ -640,6 +706,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // PASSENGER CARD
+  // ---------------------------------------------------------------
+
   Widget _buildPassengerCard(
     BuildContext context,
     Map<String, dynamic> request,
@@ -649,8 +719,20 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     final passengerName = request['passengerName']?.toString() ?? 'Passenger';
 
     final status = request['status']?.toString() ?? 'pending';
-
     final isPending = status == 'pending';
+
+    final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
+
+    // Start loading the passenger profile if it has not been loaded.
+    if (passengerId != null &&
+        !_passengerImageUrls.containsKey(passengerId) &&
+        !_loadingPassengerImages.contains(passengerId)) {
+      _loadPassengerProfileImage(request);
+    }
+
+    final imageUrl = passengerId == null
+        ? null
+        : _passengerImageUrls[passengerId];
 
     return Card(
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
@@ -659,18 +741,38 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         padding: const EdgeInsets.all(15),
         child: Column(
           children: [
-            // ---------------------------------------------------------
             // PASSENGER INFORMATION
-            // ---------------------------------------------------------
-
             Row(
               children: [
                 CircleAvatar(
                   radius: 25,
                   backgroundColor: colorScheme.primaryContainer,
-                  child: Icon(
-                    Icons.person,
-                    color: colorScheme.onPrimaryContainer,
+                  child: ClipOval(
+                    child: imageUrl == null
+                        ? Icon(
+                            Icons.person,
+                            color: colorScheme.onPrimaryContainer,
+                            size: 28,
+                          )
+                        : Image.network(
+                            imageUrl,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 50,
+                                height: 50,
+                                color: colorScheme.primaryContainer,
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.person,
+                                  color: colorScheme.onPrimaryContainer,
+                                  size: 28,
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ),
 
@@ -687,9 +789,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 5),
-
                       Text(
                         isPending
                             ? 'Passenger wants to join your ride'
@@ -709,9 +809,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
             const SizedBox(height: 14),
 
-            // ---------------------------------------------------------
-            // BUTTONS
-            // ---------------------------------------------------------
+            // ACCEPT AND REJECT BUTTONS
             if (isPending)
               Row(
                 children: [
@@ -724,9 +822,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                       label: const Text('Reject'),
                     ),
                   ),
-
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
@@ -739,6 +835,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                 ],
               ),
 
+            // MESSAGE BUTTON FOR ACCEPTED OR OTHER REQUESTS
             if (!isPending)
               SizedBox(
                 width: double.infinity,
@@ -752,9 +849,9 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                 ),
               ),
 
+            // MESSAGE BUTTON FOR PENDING REQUESTS
             if (isPending) ...[
               const SizedBox(height: 10),
-
               SizedBox(
                 width: double.infinity,
                 height: 42,
@@ -773,25 +870,12 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // REQUEST STATUS BADGE
+  // ---------------------------------------------------------------
+
   Widget _buildStatusBadge(String status, ColorScheme colorScheme) {
-    String displayStatus;
-
-    switch (status) {
-      case 'accepted':
-        displayStatus = 'Accepted';
-        break;
-
-      case 'rejected':
-        displayStatus = 'Rejected';
-        break;
-
-      case 'cancelled':
-        displayStatus = 'Cancelled';
-        break;
-
-      default:
-        displayStatus = 'Pending';
-    }
+    final displayStatus = _formatStatus(status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -814,13 +898,10 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     switch (status) {
       case 'accepted':
         return 'Accepted';
-
       case 'rejected':
         return 'Rejected';
-
       case 'cancelled':
         return 'Cancelled';
-
       default:
         return 'Pending';
     }
