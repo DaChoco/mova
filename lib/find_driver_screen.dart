@@ -22,6 +22,9 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
   final RouteService _routeService = RouteService();
 
+  final Map<int, Map<String, dynamic>> _driverProfiles = {};
+  final Set<int> _loadingDriverProfiles = {};
+
   List<Map<String, dynamic>> _rides = [];
 
   Position? _currentLocation;
@@ -44,7 +47,209 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     _loadAvailableRides();
   }
 
-  // Calculates straight-line distance between two coordinates.
+  // ---------------------------------------------------------------
+  // DRIVER PROFILE DETAILS
+  // ---------------------------------------------------------------
+
+  int? _getDriverId(Map<String, dynamic> ride) {
+    // Check common driver ID fields returned by the API.
+    for (final key in [
+      'driverId',
+      'driverUserId',
+      'userId',
+      'createdByUserId',
+    ]) {
+      final id = int.tryParse(ride[key]?.toString() ?? '');
+
+      if (id != null) return id;
+    }
+
+    // Some APIs return the driver as a nested object.
+    final driver = ride['driver'];
+
+    if (driver is Map) {
+      for (final key in ['userId', 'driverId', 'id']) {
+        final id = int.tryParse(driver[key]?.toString() ?? '');
+
+        if (id != null) return id;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _loadDriverProfile(Map<String, dynamic> ride) async {
+    final driverId = _getDriverId(ride);
+
+    if (driverId == null ||
+        _driverProfiles.containsKey(driverId) ||
+        _loadingDriverProfiles.contains(driverId)) {
+      return;
+    }
+
+    _loadingDriverProfiles.add(driverId);
+
+    try {
+      final response = await _authService.getUserProfile(driverId);
+
+      final nestedUser = response['user'];
+
+      final profile = nestedUser is Map
+          ? Map<String, dynamic>.from(nestedUser)
+          : response;
+
+      String? readText(List<String> keys) {
+        for (final key in keys) {
+          final value = profile[key]?.toString().trim();
+
+          if (value != null && value.isNotEmpty && value != 'null') {
+            return value;
+          }
+        }
+
+        return null;
+      }
+
+      final firstName = readText(['firstName', 'firstname', 'name']);
+      final surname = readText(['surname', 'lastName', 'lastname']);
+
+      final fullName = [
+        firstName,
+        surname,
+      ].where((part) => part != null && part.isNotEmpty).join(' ');
+
+      // IMPORTANT: Use profileIconUrl before profileIcon.
+      final rawImageUrl = readText([
+        'profileIconUrl',
+        'profileImageUrl',
+        'profilePictureUrl',
+        'avatarUrl',
+        'profileIcon',
+        'profileicon',
+        'profileImage',
+        'profilePicture',
+      ]);
+
+      String? imageUrl;
+
+      if (rawImageUrl != null) {
+        final uri = Uri.tryParse(rawImageUrl);
+
+        if (uri != null &&
+            (uri.scheme == 'http' || uri.scheme == 'https') &&
+            uri.host.isNotEmpty) {
+          imageUrl = rawImageUrl;
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _driverProfiles[driverId] = {
+          'name': fullName.isNotEmpty ? fullName : null,
+          'imageUrl': imageUrl,
+        };
+      });
+    } catch (e) {
+      debugPrint('Could not load driver profile $driverId: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _driverProfiles[driverId] = {'name': null, 'imageUrl': null};
+      });
+    } finally {
+      _loadingDriverProfiles.remove(driverId);
+    }
+  }
+
+  String _getDriverName(Map<String, dynamic> ride) {
+    final driverId = _getDriverId(ride);
+    final profile = driverId == null ? null : _driverProfiles[driverId];
+
+    final profileName = profile?['name']?.toString();
+
+    if (profileName != null && profileName.isNotEmpty) {
+      return profileName;
+    }
+
+    // Use a name already supplied by the ride response if available.
+    for (final key in ['driverName', 'fullName', 'name']) {
+      final name = ride[key]?.toString().trim();
+
+      if (name != null && name.isNotEmpty && name != 'null') {
+        return name;
+      }
+    }
+
+    // Also support a nested driver object in the ride response.
+    final driver = ride['driver'];
+
+    if (driver is Map) {
+      final firstName = driver['firstName']?.toString().trim() ?? '';
+      final surname =
+          driver['surname']?.toString().trim() ??
+          driver['lastName']?.toString().trim() ??
+          '';
+
+      final fullName = '$firstName $surname'.trim();
+
+      if (fullName.isNotEmpty) {
+        return fullName;
+      }
+    }
+
+    return 'Driver';
+  }
+
+  String? _getDriverImageUrl(Map<String, dynamic> ride) {
+    final driverId = _getDriverId(ride);
+    final profile = driverId == null ? null : _driverProfiles[driverId];
+
+    final profileImage = profile?['imageUrl']?.toString();
+
+    if (profileImage != null && profileImage.isNotEmpty) {
+      return profileImage;
+    }
+
+    // Also support an image URL included directly in the ride response.
+    final driver = ride['driver'];
+
+    final possibleImages = [
+      ride['profileIcon'],
+      ride['profileicon'],
+      ride['profileImageUrl'],
+      ride['profilePictureUrl'],
+      ride['avatarUrl'],
+      if (driver is Map) driver['profileIcon'],
+      if (driver is Map) driver['profileImageUrl'],
+      if (driver is Map) driver['profilePictureUrl'],
+      if (driver is Map) driver['avatarUrl'],
+    ];
+
+    for (final value in possibleImages) {
+      final image = value?.toString().trim();
+
+      if (image != null && image.isNotEmpty && image != 'null') {
+        final uri = Uri.tryParse(image);
+
+        if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+          return image;
+        }
+
+        return Uri.parse(AppConfig.backendBaseUrl)
+            .resolve(image.startsWith('/') ? image : '/$image')
+            .toString();
+      }
+    }
+
+    return null;
+  }
+
+  // ---------------------------------------------------------------
+  // DISTANCE AND NEARBY RIDES
+  // ---------------------------------------------------------------
+
   double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
     const earthRadiusKm = 6371.0;
 
@@ -59,6 +264,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
             math.sin(lonDifference / 2);
 
     final boundedA = a.clamp(0.0, 1.0);
+
     final c = 2 * math.atan2(math.sqrt(boundedA), math.sqrt(1 - boundedA));
 
     return earthRadiusKm * c;
@@ -66,9 +272,9 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
 
   double _degreesToRadians(double degrees) => degrees * math.pi / 180;
 
-  // Returns the distance from the passenger to a ride's pickup.
   double? _getRideDistance(Map<String, dynamic> ride) {
     final pickupLat = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
+
     final pickupLon = double.tryParse(
       ride['pickupLongitude']?.toString() ?? '',
     );
@@ -87,7 +293,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     );
   }
 
-  // Shows rides within 5 km by default and sorts them by distance.
   List<Map<String, dynamic>> get _visibleRides {
     final rides = List<Map<String, dynamic>>.from(_rides);
 
@@ -98,6 +303,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     if (!_showAllRides) {
       rides.removeWhere((ride) {
         final distance = _getRideDistance(ride);
+
         return distance == null || distance > _nearbyRadiusKm;
       });
     }
@@ -112,7 +318,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     return rides;
   }
 
-  // Requests permission and obtains the passenger's current GPS position.
+  // ---------------------------------------------------------------
+  // LOCATION
+  // ---------------------------------------------------------------
+
   Future<void> _useMyLocation() async {
     if (_isGettingLocation) return;
 
@@ -199,10 +408,12 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // LOAD RIDES
+  // ---------------------------------------------------------------
+
   Future<void> _loadAvailableRides() async {
-    if (_isLoading && _rides.isEmpty) {
-      // Initial loading is already in progress.
-    } else {
+    if (!(_isLoading && _rides.isEmpty)) {
       setState(() {
         _isLoading = true;
       });
@@ -233,7 +444,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
-  // Displays the passenger, pickup points, destination and selected route.
+  // ---------------------------------------------------------------
+  // MAP MARKERS AND ROUTE
+  // ---------------------------------------------------------------
+
   Future<void> _addRideMarkers() async {
     if (_mapController == null || !_mapStyleLoaded) {
       return;
@@ -264,6 +478,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
         final pickupLat = double.tryParse(
           ride['pickupLatitude']?.toString() ?? '',
         );
+
         final pickupLon = double.tryParse(
           ride['pickupLongitude']?.toString() ?? '',
         );
@@ -306,12 +521,15 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       final pickupLat = double.tryParse(
         selectedRide['pickupLatitude']?.toString() ?? '',
       );
+
       final pickupLon = double.tryParse(
         selectedRide['pickupLongitude']?.toString() ?? '',
       );
+
       final destinationLat = double.tryParse(
         selectedRide['destinationLatitude']?.toString() ?? '',
       );
+
       final destinationLon = double.tryParse(
         selectedRide['destinationLongitude']?.toString() ?? '',
       );
@@ -361,6 +579,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     await _addRideMarkers();
 
     final pickupLat = double.tryParse(ride['pickupLatitude']?.toString() ?? '');
+
     final pickupLon = double.tryParse(
       ride['pickupLongitude']?.toString() ?? '',
     );
@@ -377,7 +596,6 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
-  // Gets the route from the backend's OSRM integration.
   Future<void> _drawRoute({
     required double pickupLatitude,
     required double pickupLongitude,
@@ -442,6 +660,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // REQUEST RIDE
+  // ---------------------------------------------------------------
+
   Future<void> _requestRide(Map<String, dynamic> ride) async {
     final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
@@ -480,6 +702,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // FORMATTING
+  // ---------------------------------------------------------------
+
   String _formatScheduledTime(dynamic scheduledFor) {
     if (scheduledFor == null) return 'Unknown time';
 
@@ -498,15 +724,9 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     }
   }
 
-  String _formatFare(dynamic estimatedFare) {
-    if (estimatedFare == null) return 'Not available';
-
-    final fare = double.tryParse(estimatedFare.toString());
-
-    if (fare == null) return 'Not available';
-
-    return 'R${fare.toStringAsFixed(2)}';
-  }
+  // ---------------------------------------------------------------
+  // MAIN SCREEN
+  // ---------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -558,10 +778,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       },
       onStyleLoadedCallback: () async {
         _mapStyleLoaded = true;
+
         await _addRideMarkers();
 
-        // If GPS was obtained before the map finished loading,
-        // centre the map on the passenger once the map is ready.
+        // Centre the map on the passenger if GPS was obtained earlier.
         final location = _currentLocation;
 
         if (location != null && mounted) {
@@ -577,6 +797,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
       },
     );
   }
+
+  // ---------------------------------------------------------------
+  // EMPTY STATE
+  // ---------------------------------------------------------------
 
   Widget _buildEmptyState(ColorScheme colorScheme) {
     return Stack(
@@ -651,6 +875,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // RIDE LIST
+  // ---------------------------------------------------------------
+
   Widget _buildRideContent(ColorScheme colorScheme) {
     final visibleRides = _visibleRides;
 
@@ -720,6 +948,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                                     _showAllRides = !_showAllRides;
                                     _selectedRideId = null;
                                   });
+
                                   await _addRideMarkers();
                                 },
                           child: Text(
@@ -790,6 +1019,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                                   setState(() {
                                     _showAllRides = true;
                                   });
+
                                   await _addRideMarkers();
                                 },
                                 child: const Text('Show all rides'),
@@ -813,20 +1043,39 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // INDIVIDUAL RIDE CARD
+  // ---------------------------------------------------------------
+
   Widget _buildRideCard(BuildContext context, Map<String, dynamic> ride) {
     final colorScheme = Theme.of(context).colorScheme;
 
     final rideId = int.tryParse(ride['rideId']?.toString() ?? '');
 
     final isRequesting = rideId != null && _requestingRideId == rideId;
+
     final isSelected = rideId != null && _selectedRideId == rideId;
 
     final pickup = ride['pickupAddress']?.toString() ?? 'Unknown pickup';
+
     final destination =
         ride['destinationAddress']?.toString() ?? 'Unknown destination';
+
     final seats = ride['availableSeats']?.toString() ?? 'Unknown';
+
     final scheduled = _formatScheduledTime(ride['scheduledFor']);
-    final fare = _formatFare(ride['estimatedFare']);
+
+    final driverId = _getDriverId(ride);
+
+    // Fetch the profile when we have a driver ID.
+    if (driverId != null &&
+        !_driverProfiles.containsKey(driverId) &&
+        !_loadingDriverProfiles.contains(driverId)) {
+      _loadDriverProfile(ride);
+    }
+
+    final driverName = _getDriverName(ride);
+    final driverImageUrl = _getDriverImageUrl(ride);
     final distance = _getRideDistance(ride);
 
     return Card(
@@ -847,46 +1096,52 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Driver name and profile picture.
+              // Estimated fare has been removed.
               Row(
                 children: [
                   CircleAvatar(
                     radius: 25,
                     backgroundColor: colorScheme.primaryContainer,
-                    child: Icon(
-                      Icons.person,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
+                    child: driverImageUrl != null
+                        ? ClipOval(
+                            child: Image.network(
+                              driverImageUrl,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.person,
+                                  color: colorScheme.onPrimaryContainer,
+                                  size: 30,
+                                );
+                              },
+                            ),
+                          )
+                        : Icon(
+                            Icons.person,
+                            color: colorScheme.onPrimaryContainer,
+                            size: 30,
+                          ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Driver',
-                      style: TextStyle(
+                      driverName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        fare,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const Text(
-                        'estimated fare',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ],
-                  ),
                 ],
               ),
               const SizedBox(height: 16),
+
+              // Pickup address.
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -915,6 +1170,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                 ],
               ),
               const SizedBox(height: 10),
+
+              // Destination address.
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -942,6 +1199,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   ),
                 ],
               ),
+
+              // Distance from passenger to pickup.
               if (distance != null) ...[
                 const SizedBox(height: 10),
                 Row(
@@ -963,7 +1222,10 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                   ],
                 ),
               ],
+
               const SizedBox(height: 14),
+
+              // Ride time and available seats.
               Row(
                 children: [
                   Expanded(
@@ -984,6 +1246,7 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                 ],
               ),
               const SizedBox(height: 8),
+
               Text(
                 isSelected
                     ? 'Route currently shown on the map'
@@ -997,6 +1260,8 @@ class _FindDriverScreenState extends State<FindDriverScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+
+              // Request ride button.
               SizedBox(
                 width: double.infinity,
                 height: 48,

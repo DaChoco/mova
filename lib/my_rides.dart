@@ -97,6 +97,56 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     }
   }
 
+  Future<void> _finishRide(Map<String, dynamic> ride) async {
+    final rideId = int.parse(ride['rideId'].toString());
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete ride?'),
+        content: const Text(
+          'Are you sure you want to complete this ride? '
+          'The ride will be removed from your active rides '
+          'and will no longer be available to passengers.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep Ride'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Complete Ride'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _deletingRideId = rideId);
+
+    try {
+      // Uses the same backend operation as the existing Delete Ride button.
+      await _authService.deleteRide(rideId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _rides.removeWhere((r) => r['rideId'].toString() == '$rideId');
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Ride completed')));
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage(e);
+    } finally {
+      if (mounted) setState(() => _deletingRideId = null);
+    }
+  }
+
   String _formatScheduled(dynamic scheduledFor) {
     final date = DateTime.tryParse('$scheduledFor')?.toLocal();
 
@@ -207,23 +257,45 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
                 '${ride['pendingCount'] ?? 0} pending',
           ),
           const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: OutlinedButton.icon(
-              onPressed: _deletingRideId != null
-                  ? null
-                  : () => _deleteRide(ride),
-              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-              icon: isDeleting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.delete_outline),
-              label: Text(isDeleting ? 'Deleting...' : 'Delete Ride'),
-            ),
+
+          // Delete Ride + Finish Ride buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _deletingRideId != null
+                      ? null
+                      : () => _deleteRide(ride),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    minimumSize: const Size(0, 46),
+                  ),
+                  icon: isDeleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                  label: Text(isDeleting ? 'Deleting...' : 'Delete Ride'),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _deletingRideId != null
+                      ? null
+                      : () => _finishRide(ride),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                    minimumSize: const Size(0, 46),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Finish Ride'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

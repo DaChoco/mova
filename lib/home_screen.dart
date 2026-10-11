@@ -607,6 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 14),
 
               // Upcoming Ride information
+              // Upcoming Ride
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
@@ -621,7 +622,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Section title
                       Row(
                         children: [
                           Icon(
@@ -639,15 +639,60 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 18),
-
-                      // Upcoming ride (or empty state)
                       _buildUpcomingRide(colorScheme),
                     ],
                   ),
                 ),
               ),
+
+              // Finish Ride Reminder - Drivers Only
+              if (_user.isDriver) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: colorScheme.outline.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 24,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Remember to finish your ride',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Once your ride is completed, open My Rides and tap Finish Ride.',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

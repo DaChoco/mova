@@ -132,6 +132,7 @@ class ChatService {
 
   // NEW: marks the other participants' messages in this ride as read.
   // Backend endpoint: PATCH /api/rides/{rideId}/messages/read
+
   Future<void> markRideRead(String rideId) async {
     try {
       final res = await _call(
@@ -141,7 +142,15 @@ class ChatService {
         ),
       );
 
-      if (res.statusCode == 200) chatsChanged.value++;
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        // Refresh the Chats screen and Home unread badge.
+        chatsChanged.value++;
+      } else {
+        debugPrint(
+          'Failed to mark messages as read. '
+          'Status: ${res.statusCode}, Response: ${res.body}',
+        );
+      }
     } catch (e) {
       debugPrint('markRideRead failed for ride $rideId: $e');
     }

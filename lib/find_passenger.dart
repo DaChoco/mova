@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mova/config/app_config.dart';
@@ -54,34 +56,49 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     _loadingPassengerImages.add(passengerId);
 
     try {
-      final profile = await _authService.getUserProfile(passengerId);
+      final response = await _authService.getUserProfile(passengerId);
 
-      final rawUrl =
-          (profile['profileIcon'] ??
-                  profile['profileicon'] ??
-                  profile['profileImage'] ??
-                  profile['profileImageUrl'] ??
-                  profile['profilePicture'] ??
-                  profile['profilePictureUrl'] ??
-                  profile['avatarUrl'])
-              ?.toString()
-              .trim();
+      // Support responses that wrap the user inside a "user" object.
+      final nestedUser = response['user'];
+
+      final profile = nestedUser is Map
+          ? Map<String, dynamic>.from(nestedUser)
+          : response;
+
+      String? readText(List<String> keys) {
+        for (final key in keys) {
+          final value = profile[key]?.toString().trim();
+
+          if (value != null && value.isNotEmpty && value != 'null') {
+            return value;
+          }
+        }
+
+        return null;
+      }
+
+      // IMPORTANT: Prefer the complete Supabase URL.
+      final rawUrl = readText([
+        'profileIconUrl',
+        'profileImageUrl',
+        'profilePictureUrl',
+        'avatarUrl',
+        'profileIcon',
+        'profileicon',
+        'profileImage',
+        'profilePicture',
+      ]);
 
       String? imageUrl;
 
-      if (rawUrl != null && rawUrl.isNotEmpty && rawUrl != 'null') {
+      if (rawUrl != null) {
         final uri = Uri.tryParse(rawUrl);
 
-        if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+        // Use a complete HTTP or HTTPS URL directly.
+        if (uri != null &&
+            (uri.scheme == 'http' || uri.scheme == 'https') &&
+            uri.host.isNotEmpty) {
           imageUrl = rawUrl;
-        } else if (rawUrl.startsWith('/')) {
-          imageUrl = Uri.parse(AppConfig.backendBaseUrl)
-              .resolve(rawUrl)
-              .toString();
-        } else {
-          imageUrl = Uri.parse(AppConfig.backendBaseUrl)
-              .resolve('/$rawUrl')
-              .toString();
         }
       }
 
@@ -90,12 +107,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       setState(() {
         _passengerImageUrls[passengerId] = imageUrl;
       });
-
-      debugPrint(
-        'Passenger $passengerId profile image: ${imageUrl ?? "No image uploaded"}',
-      );
     } catch (e) {
-      debugPrint('Could not load passenger $passengerId profile: $e');
+      debugPrint('Could not load passenger profile image: $e');
 
       if (!mounted) return;
 
@@ -140,8 +153,6 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       }
 
       final requests = await _authService.getRideRequests(rideId);
-
-      debugPrint('PASSENGER REQUEST DATA: $requests');
 
       if (!mounted) return;
 
@@ -263,7 +274,6 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
           content: Text('Please wait while your account is loaded.'),
         ),
       );
-
       return;
     }
 
@@ -275,13 +285,11 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to open the conversation.')),
       );
-
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (context) => MessageScreen(
           rideId: rideId,
           currentUserId: _currentUser!.userId.toString(),
@@ -391,6 +399,11 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
               zoom: 11,
             ),
             styleString: 'https://tiles.openfreemap.org/styles/bright',
+
+            // Keep attribution away from the message buttons.
+            attributionButtonPosition: AttributionButtonPosition.topRight,
+            attributionButtonMargins: const math.Point(8, 8),
+
             onMapCreated: (controller) {
               _mapController = controller;
             },
@@ -723,7 +736,6 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
     final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
 
-    // Start loading the passenger profile if it has not been loaded.
     if (passengerId != null &&
         !_passengerImageUrls.containsKey(passengerId) &&
         !_loadingPassengerImages.contains(passengerId)) {
@@ -775,9 +787,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                           ),
                   ),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -802,7 +812,6 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                     ],
                   ),
                 ),
-
                 _buildStatusBadge(status, colorScheme),
               ],
             ),

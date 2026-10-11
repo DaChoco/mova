@@ -54,6 +54,8 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   Future<void> _loadMessages() async {
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _error = null;
@@ -67,6 +69,10 @@ class _MessageScreenState extends State<MessageScreen> {
       setState(() {
         _messages = messages;
       });
+
+      // Mark incoming messages as read on the backend.
+      // ChatService notifies the Chats and Home screens when successful.
+      await _chatService.markRideRead(widget.rideId);
     } catch (e) {
       if (!mounted) return;
 
@@ -74,11 +80,11 @@ class _MessageScreenState extends State<MessageScreen> {
         _error = 'Could not load messages';
       });
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
