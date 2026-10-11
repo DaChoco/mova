@@ -84,7 +84,7 @@ public class RidesController : ControllerBase
     }
 
     // Browse open rides with free seats (for passengers)
-   [HttpGet("available")]
+    [HttpGet("available")]
     public async Task<IActionResult> GetAvailable()
     {
         var userId = CurrentUserId();
@@ -95,6 +95,7 @@ public class RidesController : ControllerBase
             .ToListAsync();
 
         var rides = await _db.Rides
+            .Include(r => r.Driver)
             .Where(r => r.Status == "searching_driver"
                     && r.ScheduledFor > DateTime.UtcNow
                     && !rejectedRideIds.Contains(r.RideId))
@@ -102,16 +103,22 @@ public class RidesController : ControllerBase
             .ToListAsync();
 
         var result = new List<object>();
+
         foreach (var ride in rides)
         {
             var acceptedCount = await _db.RideRequests
-                .CountAsync(rr => rr.RideId == ride.RideId && rr.Status == "accepted");
+                .CountAsync(rr => rr.RideId == ride.RideId
+                               && rr.Status == "accepted");
+
             if (acceptedCount < ride.AvailableSeats)
-                result.Add(ToDto(ride));
+            {
+                result.Add(ToDto(ride, acceptedCount));
+            }
         }
 
         return Ok(new { success = true, rides = result });
     }
+
 
     [HttpGet("active")]
     public async Task<IActionResult> GetActive()
@@ -441,9 +448,19 @@ public class RidesController : ControllerBase
     private static double ToRad(double deg) => deg * Math.PI / 180;
 
     // CHANGED: optional counts and driverName added
-    private static object ToDto(Ride r, int? acceptedCount = null, int? pendingCount = null) => new
+    
+    // Ride response data, including driver information
+    private static object ToDto(
+        Ride r,
+        int? acceptedCount = null,
+        int? pendingCount = null) => new
     {
         rideId = r.RideId,
+        driverId = r.DriverId,
+        driverName = r.Driver == null
+            ? null
+            : (r.Driver.FirstName + " " + r.Driver.Surname).Trim(),
+
         status = r.Status,
 
         pickupAddress = r.PickupAddress,
@@ -459,7 +476,6 @@ public class RidesController : ControllerBase
         estimatedFare = r.EstimatedFare,
         requestedAt = r.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
 
-        driverName = r.Driver == null ? null : r.Driver.FirstName + " " + r.Driver.Surname,
         acceptedCount,
         pendingCount
     };
