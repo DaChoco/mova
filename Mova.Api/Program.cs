@@ -32,16 +32,22 @@ builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("Mong
 builder.Services.AddSingleton<MongoDbContext>();
 builder.Services.AddHttpClient<SupabaseStorageService>();
 
+
 builder.Services.AddHttpClient<OsrmService>(client =>
 {
     var baseUrl = builder.Configuration["Osrm:BaseUrl"]
-        ?? "http://127.0.0.1:5001";
+        ?? "https://router.project-osrm.org";
 
     client.BaseAddress = new Uri(
         baseUrl.TrimEnd('/') + "/");
 
     client.Timeout = TimeSpan.FromSeconds(30);
+
+    // Identify Mova when requesting routes from OSRM.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "MovaCarpoolApp/1.0");
 });
+
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));

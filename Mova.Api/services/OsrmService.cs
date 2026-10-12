@@ -34,7 +34,18 @@ public sealed class OsrmService
             requestUrl,
             cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        //response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+            throw new HttpRequestException(
+                $"OSRM returned HTTP {(int)response.StatusCode} " +
+                $"({response.ReasonPhrase}). Response: {errorBody}",
+                null,
+                response.StatusCode);
+        }
 
         var result = await response.Content
             .ReadFromJsonAsync<OsrmResponse>(
