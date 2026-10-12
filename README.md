@@ -231,9 +231,8 @@ Mova is a student software engineering project under active development. Feature
 
 Developed collaboratively as a student project.
 
-Add the team members and their respective contributions here.
+
 
 ## License
 
-No license has been specified yet. Add an appropriate license before distributing the application publicly.
-
+No license has been specified yet.
