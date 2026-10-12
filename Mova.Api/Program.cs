@@ -6,9 +6,17 @@ using Mova.Api.Data;
 using Mova.Api.Helpers;
 using Microsoft.Extensions.FileProviders;
 using DotNetEnv;
+using Mova.Api.Services;
 
-Env.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+Env.Load(
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+    new DotNetEnv.LoadOptions(
+        setEnvVars: true,
+        clobberExistingVars: false
+    )
+);
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddEnvironmentVariables();
 
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
@@ -23,6 +31,23 @@ builder.Services.AddOpenApi(options =>
 builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("MongoDB"));
 builder.Services.AddSingleton<MongoDbContext>();
 builder.Services.AddHttpClient<SupabaseStorageService>();
+
+
+builder.Services.AddHttpClient<OsrmService>(client =>
+{
+    var baseUrl = builder.Configuration["Osrm:BaseUrl"]
+        ?? "https://router.project-osrm.org";
+
+    client.BaseAddress = new Uri(
+        baseUrl.TrimEnd('/') + "/");
+
+    client.Timeout = TimeSpan.FromSeconds(30);
+
+    // Identify Mova when requesting routes from OSRM.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "MovaCarpoolApp/1.0");
+});
+
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));

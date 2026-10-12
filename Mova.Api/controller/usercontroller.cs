@@ -1,3 +1,4 @@
+
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,106 +7,183 @@ using Mova.Api.Data;
 using Mova.Api.Dtos;
 using Mova.Api.Helpers;
 
-
 namespace Mova.Api.Controllers;
 
-// Controller for handling user-related endpoints, such as retrieving user information and managing profile pictures. EVERY endpoint requires authentication via JWT.
+// Controller for handling user-related endpoints, such as retrieving user
+// information and managing profile pictures. All endpoints require JWT authentication.
 
 [ApiController]
 [Route("api/user")]
-[Authorize] // All endpoints in this controller require the user to be authenticated via JWT.
+[Authorize]
 public class UserController : ControllerBase
 {
-
     private readonly AppDbContext _db;
     private readonly SupabaseStorageService _storage;
+    private readonly IConfiguration _configuration;
 
-
-    public UserController(AppDbContext db, SupabaseStorageService storage)
+    public UserController(
+        AppDbContext db,
+        SupabaseStorageService storage,
+        IConfiguration configuration)
     {
         _db = db;
         _storage = storage;
-
+        _configuration = configuration;
     }
-    //retrieves user information based on the provided user ID.
-   [HttpGet("{id}")]
+
+    // Retrieves user information based on the provided user ID.
+    [HttpGet("{id}")]
     public async Task<IActionResult> Get(int id)
     {
-    var user = await _db.Users.FindAsync(id);
-    if (user is null)
-        return NotFound(new { success = false });
+        var user = await _db.Users.FindAsync(id);
 
-    return Ok(new
-    {
-        success = true,
-        user = new
+        if (user is null)
         {
-            userId = user.UserId,
-            studentNumber = user.StudentNumber,
-            firstName = user.FirstName,
-            surname = user.Surname,
-            isDriver = user.IsDriver,
-            carID = user.CarId,
-            profileIcon = user.ProfileIcon != null
-                ? user.ProfileIcon
-                : null
+            return NotFound(new { success = false });
         }
-    });
+
+        // Clean the configured Supabase URL.
+        // This handles values such as "https://example.supabase.co/;"
+        var supabaseUrl = _configuration["SUPABASE_URL"]?
+            .Trim()
+            .TrimEnd('/', ';');
+
+        // Remove any trailing separators left by unusual configuration values.
+        while (!string.IsNullOrEmpty(supabaseUrl) &&
+               (supabaseUrl.EndsWith('/') || supabaseUrl.EndsWith(';')))
+        {
+            supabaseUrl = supabaseUrl[..^1];
+        }
+
+        var profileIconUrl = !string.IsNullOrWhiteSpace(user.ProfileIcon)
+            && !string.IsNullOrWhiteSpace(supabaseUrl)
+                ? $"{supabaseUrl}/storage/v1/object/public/user-icons/{user.ProfileIcon.TrimStart('/')}"
+                : null;
+
+        return Ok(new
+        {
+            success = true,
+            user = new
+            {
+                userId = user.UserId,
+                studentNumber = user.StudentNumber,
+                firstName = user.FirstName,
+                surname = user.Surname,
+                isDriver = user.IsDriver,
+                carID = user.CarId,
+                profileIcon = user.ProfileIcon,
+                profileIconUrl
+            }
+        });
     }
 
     [HttpPost("update/{id}")]
     public async Task<IActionResult> Update(int id, UpdateUserRequest req)
-{
-    var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
-
-    if (id != currentUserId)
-        return Forbid();
-
-    var user = await _db.Users.FindAsync(id);
-
-    if (user is null)
-        return NotFound(new { success = false, message = "User account could not be found." });
-
-    user.IsDriver = req.IsDriver;
-
-    await _db.SaveChangesAsync();
-
-    return Ok(new
     {
-        success = true,
-        message = "User updated successfully."
-    });
-}
+        var currentUserIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (!int.TryParse(currentUserIdClaim, out var currentUserId))
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Invalid user identity."
+            });
+        }
+
+        if (id != currentUserId)
+        {
+            return Forbid();
+        }
+
+        var user = await _db.Users.FindAsync(id);
+
+        if (user is null)
+        {
+            return NotFound(new
+            {
+                success = false,
+                message = "User account could not be found."
+            });
+        }
+
+        user.IsDriver = req.IsDriver;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "User updated successfully."
+        });
+    }
 
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!);
+        var userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Invalid user identity."
+            });
+        }
 
         var user = await _db.Users.FindAsync(userId);
+
         if (user is null)
+        {
             return NotFound(new { success = false });
+        }
 
         if (!BCrypt.Net.BCrypt.Verify(req.CurrentPassword, user.PasswordHash))
-            return Unauthorized(new { success = false, message = "Current password is incorrect." });
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Current password is incorrect."
+            });
+        }
 
-        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 6)
-            return BadRequest(new { success = false, message = "New password must be at least 6 characters." });
+        if (string.IsNullOrWhiteSpace(req.NewPassword)
+            || req.NewPassword.Length < 6)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "New password must be at least 6 characters."
+            });
+        }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+
         await _db.SaveChangesAsync();
 
         var activeTokens = await _db.RefreshTokens
             .Where(rt => rt.UserId == userId && rt.RevokedAt == null)
             .ToListAsync();
 
-        foreach (var t in activeTokens)
-            t.RevokedAt = DateTime.UtcNow;
+        foreach (var token in activeTokens)
+        {
+            token.RevokedAt = DateTime.UtcNow;
+        }
 
-        return Ok(new { success = true, message = "Password changed successfully." });
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "Password changed successfully."
+        });
     }
+
     [HttpPost("profile/upload")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadProfilePicture(IFormFile file)
@@ -123,7 +201,6 @@ public class UserController : ControllerBase
             });
         }
 
-        // Find the user
         var user = await _db.Users.FindAsync(userId);
 
         if (user is null)
@@ -135,7 +212,6 @@ public class UserController : ControllerBase
             });
         }
 
-        // Validate file
         if (file is null || file.Length == 0)
         {
             return BadRequest(new
@@ -147,11 +223,11 @@ public class UserController : ControllerBase
 
         var allowedTypes = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase)
-    {
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    };
+        {
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        };
 
         if (!allowedTypes.Contains(file.ContentType))
         {
@@ -207,13 +283,12 @@ public class UserController : ControllerBase
                 url = profilePictureUrl
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // Log the exception on the server in production
             return StatusCode(500, new
             {
                 success = false,
-                message = "An error occurred while uploading the profile picture.",
+                message = "An error occurred while uploading the profile picture."
             });
         }
     }
