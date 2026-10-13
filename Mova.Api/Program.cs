@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Microsoft.IdentityModel.Tokens;
 using Mova.Api.Data;
 using Mova.Api.Helpers;
@@ -17,6 +18,23 @@ Env.Load(
 );
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
+
+var connectionString =
+    builder.Configuration.GetConnectionString("Default");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "ConnectionStrings:Default is missing.");
+}
+
+var db = new NpgsqlConnectionStringBuilder(connectionString);
+
+Console.WriteLine($"PostgreSQL host: {db.Host}");
+Console.WriteLine($"PostgreSQL port: {db.Port}");
+Console.WriteLine($"PostgreSQL database: {db.Database}");
+Console.WriteLine($"PostgreSQL username: {db.Username}");
+Console.WriteLine($"PostgreSQL password: {db.Password}");
 
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
@@ -50,7 +68,10 @@ builder.Services.AddHttpClient<OsrmService>(client =>
 
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("Default")
+        ?? throw new InvalidOperationException(
+            "Connection string 'Default' is not configured.")));
 
 var jwt = builder.Configuration.GetSection("Jwt");
 

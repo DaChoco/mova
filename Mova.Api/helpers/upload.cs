@@ -4,6 +4,9 @@ using System;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using DotNetEnv;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
 
 namespace Mova.Api.Helpers
 {
@@ -19,6 +22,62 @@ namespace Mova.Api.Helpers
         {
             _configuration = configuration;
             _httpClient = httpClient;
+        }
+
+        private async Task DeleteFolderContentsAsync(
+    string supabaseUrl,
+    string serviceKey,
+    string bucketName,
+    string folder,
+    string? excludeFileName = null)
+        {
+            while (true)
+            {
+                var listUrl = $"{supabaseUrl}/storage/v1/object/list/{bucketName}";
+
+                using var listRequest = new HttpRequestMessage(HttpMethod.Post, listUrl);
+                listRequest.Headers.Add("apikey", serviceKey);
+                listRequest.Headers.Add("Authorization", $"Bearer {serviceKey}");
+                listRequest.Content = new StringContent(
+                    JsonSerializer.Serialize(new { prefix = folder, limit = 100, offset = 0 }),
+                    Encoding.UTF8,
+                    "application/json");
+
+                using var listResponse = await _httpClient.SendAsync(listRequest);
+                var listBody = await listResponse.Content.ReadAsStringAsync();
+
+                if (!listResponse.IsSuccessStatusCode)
+                    throw new Exception($"Supabase list failed: {(int)listResponse.StatusCode} - {listBody}");
+
+                using var doc = JsonDocument.Parse(listBody);
+
+                var paths = doc.RootElement.EnumerateArray()
+                    .Select(e => e.GetProperty("name").GetString())
+                    .Where(n => !string.IsNullOrEmpty(n) && n != excludeFileName)
+                    .Select(n => $"{folder}/{n}")
+                    .ToList();
+
+                if (paths.Count == 0)
+                    return;
+                var deleteUrl = $"{supabaseUrl}/storage/v1/object/{bucketName}";
+
+                using var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, deleteUrl);
+                deleteRequest.Headers.Add("apikey", serviceKey);
+                deleteRequest.Headers.Add("Authorization", $"Bearer {serviceKey}");
+                deleteRequest.Content = new StringContent(
+                    JsonSerializer.Serialize(new { prefixes = paths }),
+                    Encoding.UTF8,
+                    "application/json");
+
+                using var deleteResponse = await _httpClient.SendAsync(deleteRequest);
+                var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
+
+                if (!deleteResponse.IsSuccessStatusCode)
+                    throw new Exception($"Supabase delete failed: {(int)deleteResponse.StatusCode} - {deleteBody}");
+
+                if (excludeFileName != null || paths.Count < 100)
+                    return;
+            }
         }
 
         public async Task<string> UploadProfilePictureAsync(
@@ -73,6 +132,9 @@ namespace Mova.Api.Helpers
                     $"{(int)response.StatusCode} " +
                     $"{response.StatusCode} - {responseBody}");
             }
+
+            // Upload succeeded: remove every other file in the user's folder
+            await DeleteFolderContentsAsync(supabaseUrl, serviceKey, bucketName, userId, excludeFileName: fileName);
 
             // Public URL
             return $"{supabaseUrl}/storage/v1/object/public/{bucketName}/{filePath}";
