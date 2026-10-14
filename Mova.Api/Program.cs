@@ -8,6 +8,7 @@ using Mova.Api.Helpers;
 using Microsoft.Extensions.FileProviders;
 using DotNetEnv;
 using Mova.Api.Services;
+using Mova.Api.Hubs;
 
 Env.Load(
     Path.Combine(Directory.GetCurrentDirectory(), ".env"),
@@ -30,11 +31,6 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 var db = new NpgsqlConnectionStringBuilder(connectionString);
 
-Console.WriteLine($"PostgreSQL host: {db.Host}");
-Console.WriteLine($"PostgreSQL port: {db.Port}");
-Console.WriteLine($"PostgreSQL database: {db.Database}");
-Console.WriteLine($"PostgreSQL username: {db.Username}");
-Console.WriteLine($"PostgreSQL password: {db.Password}");
 
 
 // Service Registration for dependency injection, including controllers, database contexts, JWT authentication, and CORS policies.
@@ -46,6 +42,7 @@ builder.Services.AddOpenApi(options =>
         Mova.Api.Helpers.BearerSecuritySchemeTransformer>();
 });
 
+builder.Services.AddSignalR();
 builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("MongoDB"));
 builder.Services.AddSingleton<MongoDbContext>();
 builder.Services.AddHttpClient<SupabaseStorageService>();
@@ -76,6 +73,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var jwt = builder.Configuration.GetSection("Jwt");
 
 // Configure JWT authentication to be used as bearer tokens.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme);
+
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -87,9 +87,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwt["Issuer"],
             ValidAudience = jwt["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!))
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt["Key"]!)
+            )
+        };
+
+        // Allow SignalR browser connections to authenticate
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken =
+                    context.Request.Query["access_token"];
+
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.StartsWithSegments("/hubs/ride-chat"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
+
 
 builder.Services.AddAuthorization();
 
@@ -114,9 +137,16 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FlutterWeb", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        policy
+            .WithOrigins(
+                "http://localhost:58608",
+                "http://localhost:58609",
+                "http://localhost:58610",
+                "http://localhost:6111"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -146,6 +176,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();   // must come before UseAuthorization
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<RideChatHub>("/hubs/ride-chat");
 
 
 

@@ -6,6 +6,8 @@ using Mova.Api.Data;
 using Mova.Api.Dtos;
 using Mova.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Mova.Api.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Mova.Api.Controllers;
 
@@ -16,11 +18,13 @@ public class MessagesController : ControllerBase
 {
     private readonly MongoDbContext _mongo;
     private readonly AppDbContext _db;
+    private readonly IHubContext<RideChatHub> _hubContext;
 
-    public MessagesController(MongoDbContext mongo, AppDbContext db)
+    public MessagesController(MongoDbContext mongo, AppDbContext db, IHubContext<RideChatHub> hubContext)
     {
         _mongo = mongo;
         _db = db;
+        _hubContext = hubContext;
     }
 
  
@@ -66,7 +70,22 @@ public class MessagesController : ControllerBase
             IsRead = false
         };
 
+        
+
         await _mongo.Messages.InsertOneAsync(doc);
+
+
+
+        var messagePayload = new
+        {
+            messageId = doc.Id,
+            senderId = doc.SenderId,
+            senderType = doc.SenderType,
+            message = doc.Message,
+            sentAt = doc.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            isRead = doc.IsRead
+        };
+        await _hubContext.Clients.Group($"ride:{rideId}").SendAsync("ReceiveMessage", messagePayload);
 
         return Ok(new
         {
