@@ -9,6 +9,7 @@ import 'chat_service.dart';
 class RideChatService {
   final String baseUrl;
   final Future<String?> Function() getAccessToken;
+  
 
   HubConnection? _connection;
 
@@ -20,6 +21,8 @@ class RideChatService {
   Future<void> connect({
     required String rideId,
     required void Function(Message) onMessage,
+    required void Function(String messageId) onMessageRead,
+    
   }) async {
     
     // Avoid opening a duplicate connection.
@@ -60,6 +63,18 @@ class RideChatService {
       // Forward the incoming message to your chat UI.
       onMessage(Message.fromJson(json));
     });
+
+    _connection!.on('MessageRead', (arguments) {
+      if (arguments == null || arguments.isEmpty) return;
+
+      final payload = arguments.first;
+      if (payload is! Map) return;
+
+      final messageId = payload['messageId']?.toString();
+      if (messageId == null || messageId.isEmpty) return;
+      });
+
+    
 
     await _connection!.start();
 

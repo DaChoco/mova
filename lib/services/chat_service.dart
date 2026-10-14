@@ -15,19 +15,32 @@ final ValueNotifier<int> chatsChanged = ValueNotifier<int>(0);
 class Message {
   final String id, senderId, text;
   final DateTime createdAt;
+  final bool isRead;
 
   Message({
     required this.id,
     required this.senderId,
     required this.text,
     required this.createdAt,
+    this.isRead = false,
   });
+
+  Message copyWith({bool? isRead}) {
+  return Message(
+    id: id,
+    senderId: senderId,
+    text: text,
+    createdAt: createdAt,
+    isRead: isRead ?? this.isRead,
+  );
+}
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
     id: json['messageId'],
     senderId: json['senderId'].toString(), // backend sends an int
     text: json['message'],
     createdAt: DateTime.parse(json['sentAt']).toLocal(),
+    isRead: json['isRead'] == true
   );
 }
 
@@ -61,6 +74,8 @@ class ChatService {
   final _auth = AuthService(baseUrl: _host);
   final _storage = const FlutterSecureStorage();
 
+  
+
   // Sends the JWT; on a 401 it refreshes the token and retries once
   Future<http.Response> _call(
     Future<http.Response> Function(Map<String, String> headers) request,
@@ -70,6 +85,9 @@ class ChatService {
       'Authorization': 'Bearer $jwt',
     };
 
+    
+
+
     var res = await request(headers(await _storage.read(key: 'jwt')));
     if (res.statusCode == 401) {
       final jwt = await _auth.refreshAccessToken();
@@ -77,6 +95,38 @@ class ChatService {
     }
     return res;
   }
+
+  
+  Future<void> markMessageAsRead(
+  String rideId,
+  String? messageId,
+) async { 
+
+  final response = await _call(
+    (headers) => http.patch(
+      Uri.parse(
+        '$_host/api/rides/$rideId/messages/$messageId/read',
+      ),
+      headers: headers,
+    ),
+  );
+
+  if (messageId == null){
+    return;
+  }
+
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    chatsChanged.value++;
+  } else {
+    throw Exception(
+      'Failed to mark message as read: '
+      '${response.statusCode} ${response.body}',
+    );
+  }
+}
+
+
+  
 
   final Map<int, String> _nameCache = {};
 
