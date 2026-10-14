@@ -139,9 +139,9 @@ public class MessagesController : ControllerBase
 
     // NEW: marks every message sent by someone else in this ride as read.
     // Called when the user opens the conversation.
-    // PATCH /api/rides/{rideId}/messages/read
+    // PATCH /api/rides/{rideId}/messages/{messageId}/read
     [HttpPatch("read")]
-    public async Task<IActionResult> MarkRideAsRead(string rideId)
+    public async Task<IActionResult> MarkRideAsRead(string messageId, string rideId)
     {
         var currentUserIdValue =
             User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -184,6 +184,12 @@ public class MessagesController : ControllerBase
             .Set(m => m.IsRead, true);
 
         var result = await _mongo.Messages.UpdateManyAsync(filter, update);
+
+        await _hubContext.Clients.Group($"ride:{rideId}").SendAsync("MessageRead", new
+    {
+        messageId = messageId,
+        isRead = true
+    });
 
         return Ok(new { success = true, updated = result.ModifiedCount });
     }

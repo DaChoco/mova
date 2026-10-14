@@ -15,8 +15,6 @@ public class RideChatHub : Hub
             Context.ConnectionId,
             groupName
         );
-
-        );
     }
 
     public async Task LeaveRide(string rideId)
