@@ -52,7 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Get the logged-in user's details
       final user = await _authService.getUser();
-      print(user.profileIcon);
 
       if (!mounted) return;
 

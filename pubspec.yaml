@@ -42,6 +42,7 @@ dependencies:
   maplibre_gl: ^0.27.1
   flutter_secure_storage: ^11.2.0
   path_provider: ^2.1.6
+  signalr_netcore: ^1.4.4
 
 dev_dependencies:
   flutter_test:

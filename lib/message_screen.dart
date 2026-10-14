@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'services/chat_service.dart' as chat;
+import 'services/ride_chat_service.dart' as rideservice;
+import 'services/auth_service.dart' as userservice;
+import 'config/app_config.dart';
 
 class MessageScreen extends StatefulWidget {
   final String rideId;
@@ -24,6 +27,8 @@ class _MessageScreenState extends State<MessageScreen> {
   final TextEditingController messageController = TextEditingController();
 
   late final chat.ChatService _chatService;
+  late final rideservice.RideChatService _rideChatService;
+  late final userservice.AuthService _authService;
 
   List<chat.Message> _messages = [];
 
@@ -35,23 +40,67 @@ class _MessageScreenState extends State<MessageScreen> {
   String _displayName = '';
   String? _profileImageUrl;
 
-  @override
-  void initState() {
-    super.initState();
+@override
+void initState() {
+  super.initState();
 
-    _chatService = chat.ChatService();
+  _chatService = chat.ChatService();
 
-    _displayName = widget.otherUserName;
+  _authService = userservice.AuthService(
+    baseUrl: AppConfig.backendBaseUrl,
+  );
 
-    _loadMessages();
-    _loadOtherUser();
+  _rideChatService = rideservice.RideChatService(
+    baseUrl: AppConfig.backendBaseUrl,
+    getAccessToken: _authService.refreshAccessToken,
+  );
+
+  _displayName = widget.otherUserName;
+
+  _loadOtherUser();
+  _initializeChat();
+}
+
+Future<void> _initializeChat() async {
+  await _connectToRideChat();
+  await _loadMessages();
+}
+
+ @override
+void dispose() {
+  _rideChatService.disconnect();
+  messageController.dispose();
+  super.dispose();
+}
+
+void _addMessageIfNew(chat.Message message) {
+  if (!mounted) return;
+
+  setState(() {
+    final alreadyExists = _messages.any(
+      (existing) => existing.id == message.id,
+    );
+
+    if (!alreadyExists) {
+      _messages.add(message);
+    }
+  });
+}
+  
+Future<void> _connectToRideChat() async {
+  try {
+    await _rideChatService.connect(
+      rideId: widget.rideId,
+      onMessage: (message) {
+
+        _addMessageIfNew(message);
+      },
+    );
+  } catch (e) {
+    debugPrint('SignalR connection failed: $e');
   }
+}
 
-  @override
-  void dispose() {
-    messageController.dispose();
-    super.dispose();
-  }
 
   Future<void> _loadMessages() async {
     if (!mounted) return;
@@ -64,11 +113,20 @@ class _MessageScreenState extends State<MessageScreen> {
     try {
       final messages = await _chatService.getMessages(widget.rideId);
 
+      
+
       if (!mounted) return;
 
       setState(() {
-        _messages = messages;
-      });
+        final merged = <String, chat.Message>{
+          for (final message in messages) message.id: message,
+          for (final message in _messages) message.id: message,
+      };
+
+        _messages = merged.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+});
+
+      
 
       // Mark incoming messages as read on the backend.
       // ChatService notifies the Chats and Home screens when successful.
@@ -146,9 +204,7 @@ class _MessageScreenState extends State<MessageScreen> {
 
       if (!mounted) return;
 
-      setState(() {
-        _messages.add(sentMessage);
-      });
+        _addMessageIfNew(sentMessage);
     } catch (e) {
       if (!mounted) return;
 

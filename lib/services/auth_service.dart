@@ -72,7 +72,9 @@ class AuthService {
     await storage.write(key: 'jwt', value: jwt);
     await storage.write(key: 'refreshToken', value: refreshToken);
   }
-
+  Future<String?> getAccessToken() async {
+  return storage.read(key: 'jwt');
+  }
   Future<String?> refreshAccessToken() async {
     final refreshToken = await storage.read(key: 'refreshToken');
 

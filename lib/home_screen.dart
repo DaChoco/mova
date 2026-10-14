@@ -50,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_user.profileIcon != null && _user.profileIcon!.isNotEmpty) {
       String profileURL =
           '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
-      print(profileURL);
       loadProfileImage(profileURL);
     } else {
       // The login response may not include profileIcon, so fetch the
