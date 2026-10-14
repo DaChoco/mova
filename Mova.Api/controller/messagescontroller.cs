@@ -125,9 +125,16 @@ public class MessagesController : ControllerBase
             return NotFound(new
             {
                 success = false,
+    
                 message = "Message not found."
             });
         }
+
+        await _hubContext.Clients.Group($"ride:{rideId}").SendAsync("MessageRead", new
+        {
+            isRead = true,
+            messageId = messageId,
+        });
 
         return Ok(new
         {
@@ -141,7 +148,7 @@ public class MessagesController : ControllerBase
     // Called when the user opens the conversation.
     // PATCH /api/rides/{rideId}/messages/{messageId}/read
     [HttpPatch("read")]
-    public async Task<IActionResult> MarkRideAsRead(string messageId, string rideId)
+    public async Task<IActionResult> MarkRideAsRead(string rideId)
     {
         var currentUserIdValue =
             User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -187,7 +194,6 @@ public class MessagesController : ControllerBase
 
         await _hubContext.Clients.Group($"ride:{rideId}").SendAsync("MessageRead", new
     {
-        messageId = messageId,
         isRead = true
     });
 
