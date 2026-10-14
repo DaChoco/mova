@@ -40,79 +40,75 @@ class _MessageScreenState extends State<MessageScreen> {
   String _displayName = '';
   String? _profileImageUrl;
 
-@override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  _chatService = chat.ChatService();
+    _chatService = chat.ChatService();
 
-  _authService = userservice.AuthService(
-    baseUrl: AppConfig.backendBaseUrl,
-  );
+    _authService = userservice.AuthService(baseUrl: AppConfig.backendBaseUrl);
 
-  _rideChatService = rideservice.RideChatService(
-    baseUrl: AppConfig.backendBaseUrl,
-    getAccessToken: _authService.refreshAccessToken,
-  );
-
-  _displayName = widget.otherUserName;
-
-  _loadOtherUser();
-  _initializeChat();
-}
-
-Future<void> _initializeChat() async {
-  await _connectToRideChat();
-  await _loadMessages();
-}
-
- @override
-void dispose() {
-  _rideChatService.disconnect();
-  messageController.dispose();
-  super.dispose();
-}
-
-void _addMessageIfNew(chat.Message message) {
-  if (!mounted) return;
-
-  setState(() {
-    final alreadyExists = _messages.any(
-      (existing) => existing.id == message.id,
+    _rideChatService = rideservice.RideChatService(
+      baseUrl: AppConfig.backendBaseUrl,
+      getAccessToken: _authService.refreshAccessToken,
     );
 
-    if (!alreadyExists) {
-      _messages.add(message);
-    }
-  });
-}
-void _markMessageReadLocally(String messageId) {
-  if (!mounted) return;
+    _displayName = widget.otherUserName;
 
-  final index = _messages.indexWhere((m) => m.id == messageId);
-  if (index == -1 || _messages[index].isRead) return;
-
-  setState(() {
-    _messages[index] = _messages[index].copyWith(isRead: true);
-  });
-}
-  
-Future<void> _connectToRideChat() async {
-  try {
-    await _rideChatService.connect(
-      rideId: widget.rideId,
-      onMessage: (message) {
-
-        _addMessageIfNew(message);
-      },
-      onMessageRead: _markMessageReadLocally,
-      
-    );
-  } catch (e) {
-    debugPrint('SignalR connection failed: $e');
+    _loadOtherUser();
+    _initializeChat();
   }
-}
 
+  Future<void> _initializeChat() async {
+    await _connectToRideChat();
+    await _loadMessages();
+  }
+
+  @override
+  void dispose() {
+    _rideChatService.disconnect();
+    messageController.dispose();
+    super.dispose();
+  }
+
+  void _addMessageIfNew(chat.Message message) {
+    if (!mounted) return;
+
+    setState(() {
+      final alreadyExists = _messages.any(
+        (existing) => existing.id == message.id,
+      );
+
+      if (!alreadyExists) {
+        _messages.add(message);
+      }
+    });
+  }
+
+  void _markMessageReadLocally(String messageId) {
+    if (!mounted) return;
+
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index == -1 || _messages[index].isRead) return;
+
+    setState(() {
+      _messages[index] = _messages[index].copyWith(isRead: true);
+    });
+  }
+
+  Future<void> _connectToRideChat() async {
+    try {
+      await _rideChatService.connect(
+        rideId: widget.rideId,
+        onMessage: (message) {
+          _addMessageIfNew(message);
+        },
+        onMessageRead: _markMessageReadLocally,
+      );
+    } catch (e) {
+      debugPrint('SignalR connection failed: $e');
+    }
+  }
 
   Future<void> _loadMessages() async {
     if (!mounted) return;
@@ -125,37 +121,28 @@ Future<void> _connectToRideChat() async {
     try {
       final messages = await _chatService.getMessages(widget.rideId);
 
-      
-
       if (!mounted) return;
       for (final message in messages) {
-  final isIncoming = message.senderId != widget.currentUserId;
+        final isIncoming = message.senderId != widget.currentUserId;
 
-  if (isIncoming && !message.isRead) {
-    try {
-      await _chatService.markMessageAsRead(
-        widget.rideId,
-        message.id,
-      );
-    } catch (e) {
-      debugPrint('Could not mark message ${message.id} as read: $e');
-    }
-  }
-}
+        if (isIncoming && !message.isRead) {
+          try {
+            await _chatService.markMessageAsRead(widget.rideId, message.id);
+          } catch (e) {
+            debugPrint('Could not mark message ${message.id} as read: $e');
+          }
+        }
+      }
 
       setState(() {
         final merged = <String, chat.Message>{
           for (final message in messages) message.id: message,
           for (final message in _messages) message.id: message,
-      };
-      
+        };
 
-        _messages = merged.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-        
-});
-
-      
+        _messages = merged.values.toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      });
 
       // Mark incoming messages as read on the backend.
       // ChatService notifies the Chats and Home screens when successful.
@@ -233,7 +220,7 @@ Future<void> _connectToRideChat() async {
 
       if (!mounted) return;
 
-        _addMessageIfNew(sentMessage);
+      _addMessageIfNew(sentMessage);
     } catch (e) {
       if (!mounted) return;
 
@@ -281,78 +268,78 @@ Future<void> _connectToRideChat() async {
     );
   }
 
-Widget _messageBubble(chat.Message message) {
-  final colorScheme = Theme.of(context).colorScheme;
-  final bool isMe = message.senderId == widget.currentUserId;
+  Widget _messageBubble(chat.Message message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final bool isMe = message.senderId == widget.currentUserId;
 
-  const radius = Radius.circular(18);
+    const radius = Radius.circular(18);
 
-  final time =
-      '${message.createdAt.hour.toString().padLeft(2, '0')}:'
-      '${message.createdAt.minute.toString().padLeft(2, '0')}';
+    final time =
+        '${message.createdAt.hour.toString().padLeft(2, '0')}:'
+        '${message.createdAt.minute.toString().padLeft(2, '0')}';
 
-  return Align(
-    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      constraints: const BoxConstraints(maxWidth: 280),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isMe
-            ? colorScheme.primary
-            : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.only(
-          topLeft: radius,
-          topRight: radius,
-          bottomLeft: isMe ? radius : Radius.zero,
-          bottomRight: isMe ? Radius.zero : radius,
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 280),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: isMe
+              ? colorScheme.primary
+              : Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF254D42)
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.only(
+            topLeft: radius,
+            topRight: radius,
+            bottomLeft: isMe ? radius : Radius.zero,
+            bottomRight: isMe ? Radius.zero : radius,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message.text,
+              style: TextStyle(
+                fontSize: 15,
+                color: isMe ? colorScheme.onPrimary : colorScheme.onSurface,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            Row(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isMe
+                        ? colorScheme.onPrimary.withValues(alpha: 0.7)
+                        : colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+
+                if (isMe)
+                  Icon(
+                    Icons.done_all,
+                    size: 18,
+                    color: message.isRead
+                        ? const Color(0xFF40C4FF)
+                        : colorScheme.onPrimary.withValues(alpha: 0.8),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            message.text,
-            style: TextStyle(
-              fontSize: 15,
-              color: isMe
-                  ? colorScheme.onPrimary
-                  : colorScheme.onSurface,
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          Row(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                time,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isMe
-                      ? colorScheme.onPrimary.withValues(alpha: 0.7)
-                      : colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-
-              if (isMe)
-                Icon(
-                  Icons.done_all,
-                  size: 16,
-                  color: message.isRead
-                      ? Colors.lightBlueAccent
-                      : colorScheme.onPrimary.withValues(alpha: 0.7),
-                ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _messageList() {
     if (_loading) {
