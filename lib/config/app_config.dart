@@ -4,7 +4,7 @@ class AppConfig {
 
   // Backend API
   static const String backendBaseUrl =
-      'http://localhost:5000';
+      'http://mova.runasp.net';
 
 //This is here so that its easy to switch to the correct url. Localhost urls = DaChoco Local testing
   static const String quickSwapUrl = 
