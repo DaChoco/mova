@@ -73,6 +73,12 @@ flutter:
   assets:
     - assets/mova-icon.png
 
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-ExtraBold.ttf
+          weight: 800
+
 
 flutter_launcher_icons:
   android: true

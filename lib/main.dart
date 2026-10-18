@@ -14,6 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: themeModeNotifier,
+      child: const SplashScreen(),
       builder: (context, isDarkMode, child) {
         return MaterialApp(
           title: 'Carpool App',
@@ -36,7 +37,7 @@ class MyApp extends StatelessWidget {
 
           themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
-          home: const SplashScreen(),
+          home: child,
         );
       },
     );

@@ -25,7 +25,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _hideConfirmPassword = true;
   bool _isRegistering = false;
 
-  // Use the same backend address that worked for your login.
+  static const Color _movaGreen = Color(0xFF0F6E56);
+
   final AuthService _authService = AuthService(
     baseUrl: AppConfig.backendBaseUrl,
   );
@@ -61,11 +62,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Registration successful!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registration successful!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
 
-      // Return to the login screen after successful registration.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -74,7 +77,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } finally {
       if (mounted) {
@@ -87,217 +93,484 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final borderRadius = BorderRadius.circular(16);
+
+    final inputDecoration = InputDecoration(
+      filled: true,
+      fillColor: colors.surfaceContainerHighest.withAlpha(isDark ? 150 : 100),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      labelStyle: TextStyle(
+        fontFamily: 'Nunito',
+        color: colors.onSurfaceVariant,
+      ),
+      hintStyle: TextStyle(
+        fontFamily: 'Nunito',
+        color: colors.onSurfaceVariant.withAlpha(180),
+      ),
+      prefixIconColor: colors.primary,
+      border: OutlineInputBorder(
+        borderRadius: borderRadius,
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: borderRadius,
+        borderSide: BorderSide(color: colors.outlineVariant.withAlpha(130)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: borderRadius,
+        borderSide: const BorderSide(color: _movaGreen, width: 1.8),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: borderRadius,
+        borderSide: BorderSide(color: colors.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: borderRadius,
+        borderSide: BorderSide(color: colors.error, width: 1.8),
+      ),
+    );
+
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Student Registration',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+      backgroundColor: colors.surface,
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              _movaGreen.withAlpha(isDark ? 45 : 20),
+              colors.surface,
+              colors.surface,
+            ],
+            stops: const [0.0, 0.42, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 28,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 56,
                   ),
-
-                  const SizedBox(height: 40),
-
-                  // Student Name
-                  TextFormField(
-                    controller: studentNameController,
-                    keyboardType: TextInputType.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Student Name',
-                      hintText: 'Enter your real name',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      final RegExp regularExpression = RegExp(
-                        r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
-                      );
-
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your surname';
-                      } else if (!regularExpression.hasMatch(value.trim())) {
-                        return 'Please enter a valid surname';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Student Surname
-                  TextFormField(
-                    controller: studentSurnameController,
-                    keyboardType: TextInputType.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Student Surname',
-                      hintText: 'Enter your real surname',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      final RegExp regularExpression = RegExp(
-                        r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
-                      );
-
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your surname';
-                      } else if (!regularExpression.hasMatch(value.trim())) {
-                        return 'Please enter a valid surname';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Student Number
-                  TextFormField(
-                    controller: studentNumberController,
-                    keyboardType: TextInputType.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Student Number',
-                      hintText: 'Enter your student number',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your student number';
-                      } else if (!RegExp(
-                            r'^EDUV\d{7}$',
-                            caseSensitive: false,
-                          ).hasMatch(value) &&
-                          !RegExp(
-                            r'^[A-Z0-9]{9}$',
-                            caseSensitive: false,
-                          ).hasMatch(value)) {
-                        return 'Enter a valid student number';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Password
-                  TextFormField(
-                    controller: passwordController,
-                    obscureText: _hidePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      hintText: 'Enter your password',
-                      prefixIcon: const Icon(Icons.lock),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _hidePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _hidePassword = !_hidePassword;
-                          });
-                        },
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Confirm Password
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    obscureText: _hideConfirmPassword,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      hintText: 'Re-enter your password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _hideConfirmPassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _hideConfirmPassword = !_hideConfirmPassword;
-                          });
-                        },
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
-                      }
-
-                      if (value != passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // Register button
-                  SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isRegistering ? null : _register,
-                      child: _isRegistering
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Register',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  // Login link
-                  TextButton(
-                    onPressed: _isRegistering
-                        ? null
-                        : () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LoginScreen(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Mova branding.
+                            Center(
+                              child: Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: _movaGreen,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _movaGreen.withAlpha(60),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.route_rounded,
+                                  size: 38,
+                                  color: Color(0xFFD1FAEB),
+                                ),
                               ),
-                            );
-                          },
-                    child: const Text(
-                      'Already have an account? Login',
-                      style: TextStyle(fontSize: 16),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            Text(
+                              'Join Mova',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 31,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                                color: colors.onSurface,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              'Create your account and get moving.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontSize: 15,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+
+                            const SizedBox(height: 28),
+
+                            // Registration form card.
+                            Container(
+                              padding: const EdgeInsets.all(22),
+                              decoration: BoxDecoration(
+                                color: colors.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(26),
+                                border: Border.all(
+                                  color: colors.outlineVariant.withAlpha(90),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(
+                                      isDark ? 35 : 10,
+                                    ),
+                                    blurRadius: 28,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Student Registration',
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontSize: 21,
+                                      fontWeight: FontWeight.w800,
+                                      color: colors.onSurface,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 6),
+
+                                  Text(
+                                    'Enter your details to get started.',
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontSize: 14,
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 24),
+
+                                  // Student name.
+                                  TextFormField(
+                                    controller: studentNameController,
+                                    keyboardType: TextInputType.text,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      color: colors.onSurface,
+                                    ),
+                                    decoration: inputDecoration.copyWith(
+                                      labelText: 'Student Name',
+                                      hintText: 'Enter your real name',
+                                      prefixIcon: const Icon(
+                                        Icons.person_outline_rounded,
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      final regularExpression = RegExp(
+                                        r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
+                                      );
+
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter your surname';
+                                      } else if (!regularExpression.hasMatch(
+                                        value.trim(),
+                                      )) {
+                                        return 'Please enter a valid surname';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 17),
+
+                                  // Student surname.
+                                  TextFormField(
+                                    controller: studentSurnameController,
+                                    keyboardType: TextInputType.text,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      color: colors.onSurface,
+                                    ),
+                                    decoration: inputDecoration.copyWith(
+                                      labelText: 'Student Surname',
+                                      hintText: 'Enter your real surname',
+                                      prefixIcon: const Icon(
+                                        Icons.badge_outlined,
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      final regularExpression = RegExp(
+                                        r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
+                                      );
+
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter your surname';
+                                      } else if (!regularExpression.hasMatch(
+                                        value.trim(),
+                                      )) {
+                                        return 'Please enter a valid surname';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 17),
+
+                                  // Student number.
+                                  TextFormField(
+                                    controller: studentNumberController,
+                                    keyboardType: TextInputType.text,
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      color: colors.onSurface,
+                                    ),
+                                    decoration: inputDecoration.copyWith(
+                                      labelText: 'Student Number',
+                                      hintText: 'Enter your student number',
+                                      prefixIcon: const Icon(
+                                        Icons.school_outlined,
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter your student number';
+                                      } else if (!RegExp(
+                                            r'^EDUV\d{7}$',
+                                            caseSensitive: false,
+                                          ).hasMatch(value) &&
+                                          !RegExp(
+                                            r'^[A-Z0-9]{9}$',
+                                            caseSensitive: false,
+                                          ).hasMatch(value)) {
+                                        return 'Enter a valid student number';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 17),
+
+                                  // Password.
+                                  TextFormField(
+                                    controller: passwordController,
+                                    obscureText: _hidePassword,
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      color: colors.onSurface,
+                                    ),
+                                    decoration: inputDecoration.copyWith(
+                                      labelText: 'Password',
+                                      hintText: 'Create a password',
+                                      prefixIcon: const Icon(
+                                        Icons.lock_outline_rounded,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        tooltip: _hidePassword
+                                            ? 'Show password'
+                                            : 'Hide password',
+                                        icon: Icon(
+                                          _hidePassword
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _hidePassword = !_hidePassword;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter your password';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 17),
+
+                                  // Confirm password.
+                                  TextFormField(
+                                    controller: confirmPasswordController,
+                                    obscureText: _hideConfirmPassword,
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      color: colors.onSurface,
+                                    ),
+                                    decoration: inputDecoration.copyWith(
+                                      labelText: 'Confirm Password',
+                                      hintText: 'Re-enter your password',
+                                      prefixIcon: const Icon(
+                                        Icons.lock_reset_rounded,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        tooltip: _hideConfirmPassword
+                                            ? 'Show password'
+                                            : 'Hide password',
+                                        icon: Icon(
+                                          _hideConfirmPassword
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _hideConfirmPassword =
+                                                !_hideConfirmPassword;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please confirm your password';
+                                      }
+
+                                      if (value != passwordController.text) {
+                                        return 'Passwords do not match';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 26),
+
+                                  // Register button.
+                                  SizedBox(
+                                    height: 56,
+                                    child: FilledButton(
+                                      onPressed: _isRegistering
+                                          ? null
+                                          : _register,
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: _movaGreen,
+                                        foregroundColor: Colors.white,
+                                        disabledBackgroundColor: _movaGreen
+                                            .withAlpha(130),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                      ),
+                                      child: _isRegistering
+                                          ? const SizedBox(
+                                              width: 23,
+                                              height: 23,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  'Create Account',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Nunito',
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                                SizedBox(width: 9),
+                                                Icon(
+                                                  Icons.arrow_forward_rounded,
+                                                  size: 20,
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 22),
+
+                            // Login link.
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'Already have an account?',
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontSize: 14,
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _isRegistering
+                                      ? null
+                                      : () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const LoginScreen(),
+                                            ),
+                                          );
+                                        },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: colors.primary,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Login',
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),

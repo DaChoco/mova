@@ -15,9 +15,8 @@ final ValueNotifier<Uint8List?> profileImageNotifier =
     ValueNotifier<Uint8List?>(null);
 
 // Downloads the profile picture from [url] and stores it in
-// [profileImageNotifier]. Safe to call from any screen.
+// [profileImageNotifier].
 Future<void> loadProfileImage(String? url) async {
-  // No profile picture has been uploaded yet.
   if (url == null || url.isEmpty) {
     profileImageNotifier.value = null;
     return;
@@ -30,7 +29,7 @@ Future<void> loadProfileImage(String? url) async {
       profileImageNotifier.value = response.bodyBytes;
     }
   } catch (_) {
-    // If the image cannot be loaded, keep whatever is currently shown.
+    // Keep the existing image if loading fails.
   }
 }
 
@@ -44,6 +43,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const Color _movaGreen = Color(0xFF0F6E56);
+
   late User _user;
 
   final AuthService _authService = AuthService(
@@ -51,18 +52,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   );
 
   bool _isUploadingImage = false;
+  bool _isSavingRole = false;
+  bool _isChangingPassword = false;
 
   final TextEditingController _currentPasswordController =
       TextEditingController();
-
   final TextEditingController _newPasswordController = TextEditingController();
-
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-
   final TextEditingController _carRegistrationController =
       TextEditingController();
-
   final TextEditingController _carModelController = TextEditingController();
 
   String _selectedRole = 'Passenger';
@@ -80,11 +79,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _user = widget.user;
     _selectedRole = _user.isDriver ? 'Driver' : 'Passenger';
 
-    // HomeScreen normally loads the picture already. Only download it
-    // here if the notifier is still empty.
     if (profileImageNotifier.value == null) {
-      String profileURL = '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
-      print(profileURL);
+      final profileURL =
+          '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
       loadProfileImage(profileURL);
     }
   }
@@ -94,18 +91,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
-
     _carRegistrationController.dispose();
     _carModelController.dispose();
-
     super.dispose();
   }
 
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Future<void> _saveAccountRole() async {
+    if (_isSavingRole) return;
+
     final carRegistration = _carRegistrationController.text.trim();
     final carModel = _carModelController.text.trim();
 
-    final bool isDriver = carRegistration.isNotEmpty && carModel.isNotEmpty;
+    final bool isDriver =
+        _selectedRole == 'Driver' &&
+        carRegistration.isNotEmpty &&
+        carModel.isNotEmpty;
+
+    if (_selectedRole == 'Driver' && !isDriver) {
+      _showMessage('Please enter your car registration and model.');
+      return;
+    }
+
+    setState(() => _isSavingRole = true);
 
     try {
       await _authService.updateDriverStatus(
@@ -125,8 +144,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           carID: _user.carID,
           profileIcon: _user.profileIcon,
         );
-
         _selectedRole = isDriver ? 'Driver' : 'Passenger';
+        _isSavingRole = false;
       });
 
       _showMessage(
@@ -135,11 +154,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      setState(() => _isSavingRole = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
   Future<void> _pickProfileImage() async {
+    if (_isUploadingImage) return;
+
     try {
       final picker = ImagePicker();
 
@@ -148,27 +170,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imageQuality: 85,
       );
 
-      if (image == null) {
-        return;
-      }
+      if (image == null || !mounted) return;
 
-      if (!mounted) return;
+      setState(() => _isUploadingImage = true);
 
-      setState(() {
-        _isUploadingImage = true;
-      });
-
-      // Upload the XFile directly to the backend.
       final imageUrl = await _authService.uploadProfilePicture(image);
-
-      // Read the image bytes so it can be displayed on
-      // both Chrome and Android.
       final imageBytes = await image.readAsBytes();
 
       profileImageNotifier.value = imageBytes;
 
-      // Update the local User object with the URL returned
-      // by the backend.
       _user = User(
         userId: _user.userId,
         studentNumber: _user.studentNumber,
@@ -181,25 +191,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
-      setState(() {
-        _isUploadingImage = false;
-      });
-
+      setState(() => _isUploadingImage = false);
       _showMessage('Profile picture updated');
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        _isUploadingImage = false;
-      });
-
+      setState(() => _isUploadingImage = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   bool _validatePasswords() {
@@ -207,43 +206,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
+    String? error;
+
     if (currentPassword.isEmpty ||
         newPassword.isEmpty ||
         confirmPassword.isEmpty) {
-      setState(() {
-        _passwordError = 'Please fill in all password fields.';
-      });
-
-      return false;
+      error = 'Please fill in all password fields.';
+    } else if (newPassword.length < 6) {
+      error = 'New password must be at least 6 characters.';
+    } else if (newPassword != confirmPassword) {
+      error = 'Passwords do not match.';
     }
 
-    if (newPassword.length < 6) {
-      setState(() {
-        _passwordError = 'New password must be at least 6 characters.';
-      });
-
-      return false;
-    }
-
-    if (newPassword != confirmPassword) {
-      setState(() {
-        _passwordError = 'Passwords do not match.';
-      });
-
-      return false;
-    }
-
-    setState(() {
-      _passwordError = null;
-    });
-
-    return true;
+    setState(() => _passwordError = error);
+    return error == null;
   }
 
   Future<void> _changePassword() async {
-    if (!_validatePasswords()) {
-      return;
-    }
+    if (_isChangingPassword || !_validatePasswords()) return;
+
+    setState(() => _isChangingPassword = true);
 
     try {
       await _authService.changePassword(
@@ -259,7 +241,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       await _authService.logout();
 
-      // Clear the shared image so the next login starts fresh.
       profileImageNotifier.value = null;
 
       if (!mounted) return;
@@ -272,37 +253,194 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      setState(() => _isChangingPassword = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  // Greyed-out, read-only field for data the user cannot change.
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: _movaGreen),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: _movaGreen, width: 1.5),
+      ),
+    );
+  }
+
   Widget _buildInfoField(String label, String value, IconData icon) {
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: IgnorePointer(
-        child: TextFormField(
-          // Key on value so the field updates if the data changes.
-          key: ValueKey('$label:$value'),
-          initialValue: value,
-          readOnly: true,
-          style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
-          decoration: InputDecoration(
-            labelText: label,
-            labelStyle: TextStyle(
-              color: scheme.onSurface.withValues(alpha: 0.6),
-            ),
-            prefixIcon: Icon(
-              icon,
-              color: scheme.onSurface.withValues(alpha: 0.5),
-            ),
-            filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.2),
-            border: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.4)),
-            ),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        key: ValueKey('$label:$value'),
+        initialValue: value,
+        readOnly: true,
+        style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.72)),
+        decoration: _inputDecoration(label: label, icon: icon).copyWith(
+          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 22),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.045),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _movaGreen.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: _movaGreen, size: 23),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required String label,
+    required TextEditingController controller,
+    required bool obscureText,
+    required VoidCallback onToggle,
+    String? errorText,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      onChanged: (_) {
+        if (_passwordError != null) {
+          setState(() => _passwordError = null);
+        }
+      },
+      decoration: _inputDecoration(
+        label: label,
+        icon: Icons.lock_outline_rounded,
+        suffixIcon: IconButton(
+          tooltip: obscureText ? 'Show password' : 'Hide password',
+          icon: Icon(
+            obscureText
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+          ),
+          onPressed: onToggle,
+        ),
+      ).copyWith(errorText: errorText),
+    );
+  }
+
+  Widget _buildPrimaryButton({
+    required String label,
+    required VoidCallback? onPressed,
+    bool isLoading = false,
+    IconData? icon,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: isLoading
+            ? const SizedBox(
+                height: 19,
+                width: 19,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Icon(icon ?? Icons.check_rounded, size: 20),
+        label: Text(
+          isLoading ? 'Please wait...' : label,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _movaGreen,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: _movaGreen.withValues(alpha: 0.55),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
         ),
       ),
@@ -311,276 +449,372 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isDriver = _selectedRole == 'Driver';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text(
+          'My Profile',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        centerTitle: false,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // -------------------------------------------------
-            // PROFILE PICTURE
-            // -------------------------------------------------
-            ValueListenableBuilder<Uint8List?>(
-              valueListenable: profileImageNotifier,
-              builder: (context, image, child) {
-                return Center(
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundImage: image != null
-                            ? MemoryImage(image)
-                            : null,
-                        child: image == null
-                            ? const Icon(Icons.person, size: 65)
-                            : null,
-                      ),
-
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: CircleAvatar(
-                          radius: 20,
-                          child: _isUploadingImage
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : IconButton(
-                                  icon: const Icon(Icons.camera_alt, size: 20),
-                                  onPressed: _pickProfileImage,
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 25),
-
-            // -------------------------------------------------
-            // PERSONAL INFORMATION (greyed out, read-only)
-            // -------------------------------------------------
-            const Text(
-              'Personal Information',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 16),
-
-            _buildInfoField(
-              'First Name',
-              _user.firstName,
-              Icons.person_outline,
-            ),
-
-            _buildInfoField('Surname', _user.surname, Icons.person_outline),
-
-            _buildInfoField(
-              'Student Number',
-              _user.studentNumber,
-              Icons.badge_outlined,
-            ),
-
-            _buildInfoField(
-              'Student Email',
-              '${_user.studentNumber}@vossie.net',
-              Icons.email_outlined,
-            ),
-
-            const SizedBox(height: 14),
-
-            // -------------------------------------------------
-            // CHANGE PASSWORD
-            // -------------------------------------------------
-            const Text(
-              'Change Password',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 15),
-
-            TextField(
-              controller: _currentPasswordController,
-              obscureText: _obscureCurrentPassword,
-              decoration: InputDecoration(
-                labelText: 'Current Password',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureCurrentPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureCurrentPassword = !_obscureCurrentPassword;
-                    });
-                  },
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            TextField(
-              controller: _newPasswordController,
-              obscureText: _obscureNewPassword,
-              decoration: InputDecoration(
-                labelText: 'New Password',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureNewPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureNewPassword = !_obscureNewPassword;
-                    });
-                  },
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            TextField(
-              controller: _confirmPasswordController,
-              obscureText: _obscureConfirmPassword,
-              decoration: InputDecoration(
-                labelText: 'Confirm New Password',
-                errorText: _passwordError,
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirmPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
+            // Profile header
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey.withValues(alpha: 0.15),
+                gradient: LinearGradient(
+                  colors: [_movaGreen, _movaGreen.withValues(alpha: 0.82)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: _movaGreen.withValues(alpha: 0.13),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
                 children: [
-                  Icon(Icons.info_outline),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Your new password must be at least 6 characters long. '
-                      'Changing your password will sign you out.',
+                  ValueListenableBuilder<Uint8List?>(
+                    valueListenable: profileImageNotifier,
+                    builder: (context, image, child) {
+                      return Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                width: 2,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 49,
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.18,
+                              ),
+                              backgroundImage: image != null
+                                  ? MemoryImage(image)
+                                  : null,
+                              child: image == null
+                                  ? const Icon(
+                                      Icons.person_rounded,
+                                      size: 55,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          Material(
+                            color: Colors.white,
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: _isUploadingImage
+                                  ? null
+                                  : _pickProfileImage,
+                              child: Padding(
+                                padding: const EdgeInsets.all(9),
+                                child: _isUploadingImage
+                                    ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: _movaGreen,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.camera_alt_rounded,
+                                        size: 18,
+                                        color: _movaGreen,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    '${_user.firstName} ${_user.surname}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _user.studentNumber,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isDriver
+                              ? Icons.directions_car_rounded
+                              : Icons.person_rounded,
+                          size: 17,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          isDriver ? 'Driver Account' : 'Passenger Account',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 26),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _changePassword,
-                child: const Text('Change Password'),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // -------------------------------------------------
-            // ACCOUNT ROLE
-            // -------------------------------------------------
-            const Text(
-              'Account Role',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 12),
-
-            DropdownButtonFormField<String>(
-              initialValue: _selectedRole,
-              decoration: const InputDecoration(
-                labelText: 'Role',
-                prefixIcon: Icon(Icons.account_circle_outlined),
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'Driver', child: Text('Driver')),
-                DropdownMenuItem(value: 'Passenger', child: Text('Passenger')),
+            // Personal information
+            _buildSection(
+              title: 'Personal Information',
+              subtitle: 'Your registered student details',
+              icon: Icons.person_outline_rounded,
+              children: [
+                _buildInfoField(
+                  'First Name',
+                  _user.firstName,
+                  Icons.badge_outlined,
+                ),
+                _buildInfoField(
+                  'Surname',
+                  _user.surname,
+                  Icons.person_outline_rounded,
+                ),
+                _buildInfoField(
+                  'Student Number',
+                  _user.studentNumber,
+                  Icons.school_outlined,
+                ),
+                _buildInfoField(
+                  'Student Email',
+                  '${_user.studentNumber}@vossie.net',
+                  Icons.email_outlined,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 17,
+                      color: scheme.onSurface.withValues(alpha: 0.55),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'These details are read-only.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-              onChanged: (value) {
-                if (value == null) return;
-
-                setState(() {
-                  _selectedRole = value;
-                });
-              },
             ),
 
-            // -------------------------------------------------
-            // DRIVER DETAILS (only when role is Driver)
-            // -------------------------------------------------
-            if (isDriver) ...[
-              const SizedBox(height: 28),
-
-              const Text(
-                'Driver Details',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextField(
-                controller: _carRegistrationController,
-                decoration: const InputDecoration(
-                  labelText: 'Car Registration',
-                  prefixIcon: Icon(Icons.confirmation_number_outlined),
-                  border: OutlineInputBorder(),
+            // Change password
+            _buildSection(
+              title: 'Security',
+              subtitle: 'Keep your account secure',
+              icon: Icons.shield_outlined,
+              children: [
+                _buildPasswordField(
+                  label: 'Current Password',
+                  controller: _currentPasswordController,
+                  obscureText: _obscureCurrentPassword,
+                  onToggle: () => setState(
+                    () => _obscureCurrentPassword = !_obscureCurrentPassword,
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 15),
-
-              TextField(
-                controller: _carModelController,
-                decoration: const InputDecoration(
-                  labelText: 'Car Model',
-                  prefixIcon: Icon(Icons.directions_car_outlined),
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 15),
+                _buildPasswordField(
+                  label: 'New Password',
+                  controller: _newPasswordController,
+                  obscureText: _obscureNewPassword,
+                  onToggle: () => setState(
+                    () => _obscureNewPassword = !_obscureNewPassword,
+                  ),
                 ),
-              ),
-            ],
-            const SizedBox(height: 20),
+                const SizedBox(height: 15),
+                _buildPasswordField(
+                  label: 'Confirm New Password',
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  onToggle: () => setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                  ),
+                  errorText: _passwordError,
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: _movaGreen.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        color: _movaGreen,
+                        size: 20,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Your new password must be at least 6 characters. '
+                          'You will be signed out after changing it.',
+                          style: TextStyle(fontSize: 12, height: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _buildPrimaryButton(
+                  label: 'Change Password',
+                  icon: Icons.lock_reset_rounded,
+                  isLoading: _isChangingPassword,
+                  onPressed: _isChangingPassword ? null : _changePassword,
+                ),
+              ],
+            ),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveAccountRole,
-                child: const Text('Save'),
+            // Account role and driver details
+            _buildSection(
+              title: 'Account Role',
+              subtitle: 'Choose how you use Mova',
+              icon: Icons.swap_horiz_rounded,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedRole,
+                  decoration: _inputDecoration(
+                    label: 'Account Type',
+                    icon: Icons.account_circle_outlined,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  items: const [
+                    DropdownMenuItem(value: 'Driver', child: Text('Driver')),
+                    DropdownMenuItem(
+                      value: 'Passenger',
+                      child: Text('Passenger'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    setState(() => _selectedRole = value);
+                  },
+                ),
+                if (isDriver) ...[
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.directions_car_outlined,
+                        color: _movaGreen,
+                      ),
+                      const SizedBox(width: 9),
+                      Text(
+                        'Driver Details',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: _carRegistrationController,
+                    decoration: _inputDecoration(
+                      label: 'Car Registration',
+                      icon: Icons.confirmation_number_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: _carModelController,
+                    decoration: _inputDecoration(
+                      label: 'Car Model',
+                      icon: Icons.directions_car_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Both fields are required to enable your driver account.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                _buildPrimaryButton(
+                  label: 'Save Account Settings',
+                  icon: Icons.check_circle_outline_rounded,
+                  isLoading: _isSavingRole,
+                  onPressed: _isSavingRole ? null : _saveAccountRole,
+                ),
+              ],
+            ),
+
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 8),
+                child: Text(
+                  'Mova • Campus Rides, Shared',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurface.withValues(alpha: 0.45),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ),
           ],
