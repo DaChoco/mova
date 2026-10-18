@@ -15,6 +15,7 @@ import 'services/chat_service.dart' as chat;
 import 'login_screen.dart';
 import 'create_ride.dart';
 import 'my_rides.dart';
+import 'terms_and_conditions.dart';
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -485,6 +486,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     onChanged: (value) {
                       themeModeNotifier.value = value;
                     },
+                  );
+                },
+              ),
+
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text(
+                  'Terms & Conditions',
+                  style: TextStyle(fontFamily: 'Nunito'),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TermsAndConditionsScreen(),
+                    ),
                   );
                 },
               ),

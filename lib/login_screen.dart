@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'terms_and_conditions.dart';
 import 'config/app_config.dart';
 import 'register_screen.dart';
 import 'models/auth.dart';
@@ -378,6 +379,56 @@ class _LoginScreenState extends State<LoginScreen> {
                                                 ),
                                               ],
                                             ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Terms and Conditions notice.
+                                  Center(
+                                    child: Wrap(
+                                      alignment: WrapAlignment.center,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        Text(
+                                          'By signing in, you agree to our ',
+                                          style: TextStyle(
+                                            fontFamily: 'Nunito',
+                                            fontSize: 12,
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const TermsAndConditionsScreen(),
+                                              ),
+                                            );
+                                          },
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: colors.primary,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 2,
+                                            ),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                          ),
+                                          child: const Text(
+                                            'Terms & Conditions',
+                                            style: TextStyle(
+                                              fontFamily: 'Nunito',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],

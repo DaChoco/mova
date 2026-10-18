@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mova/config/app_config.dart';
 
+import 'terms_and_conditions.dart';
+
 import 'login_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
@@ -510,6 +512,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                 ),
                                               ],
                                             ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Terms and Conditions notice.
+                                  Center(
+                                    child: Wrap(
+                                      alignment: WrapAlignment.center,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        Text(
+                                          'By registering, you agree to our ',
+                                          style: TextStyle(
+                                            fontFamily: 'Nunito',
+                                            fontSize: 12,
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const TermsAndConditionsScreen(),
+                                              ),
+                                            );
+                                          },
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: colors.primary,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 2,
+                                            ),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                          ),
+                                          child: const Text(
+                                            'Terms & Conditions',
+                                            style: TextStyle(
+                                              fontFamily: 'Nunito',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
