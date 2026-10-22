@@ -8,6 +8,7 @@ public class MongoDbContext
 {
     private readonly IMongoDatabase _database;
 
+    // Constructor that initializes the MongoDB context using the provided settings.
     public MongoDbContext(IOptions<MongoSettings> settings)
     {
         var client = new MongoClient(settings.Value.ConnectionString);
