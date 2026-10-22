@@ -11,10 +11,6 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-.vs/
-bin/
-obj/
-.env*
 
 # IntelliJ related
 *.iml
