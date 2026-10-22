@@ -229,10 +229,15 @@ Mova is a student software engineering project under active development. Feature
 
 ## Contributors
 
+[Yaeshveer Naidoo](https://github.com/FriedFly)
+[Keano Hsu](https://github.com/keanohsu22-ops)
+[Maile Chokoe](https://github.com/DaChoco)
+[Jayden Carolissen](https://github.com/UncleDonut)
+[Josh-Lee Biggs](https://github.com/heavenoffline)
+[Kreesan Naicker](https://github.com/kreesan1)
+
 Developed collaboratively as a student project.
-
-
 
 ## License
 
-No license has been specified yet.
+MIT
