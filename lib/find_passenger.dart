@@ -9,6 +9,9 @@ import 'message_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
 
+// Driver-side screen: shows the driver's active ride on a map and lists
+// the passengers who have requested to join, with accept / reject and
+// message actions.
 class FindPassengerScreen extends StatefulWidget {
   const FindPassengerScreen({super.key});
 
@@ -21,17 +24,31 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     baseUrl: AppConfig.backendBaseUrl,
   );
 
+  // Fetches the driving route between two points.
   final RouteService _routeService = RouteService();
 
+  // Cache of passenger profile image URLs, keyed by passenger ID.
+  // A null value means "looked up, but no usable image".
   final Map<int, String?> _passengerImageUrls = {};
+
+  // IDs of passengers whose images are currently being loaded
+  // (prevents duplicate requests).
   final Set<int> _loadingPassengerImages = {};
 
   MapLibreMapController? _mapController;
 
+  // True once the map style has finished loading (markers can be drawn).
   bool _mapStyleLoaded = false;
+
+  // The logged-in driver.
   User? _currentUser;
+
+  // The driver's active ride (null if they don't have one).
   Map<String, dynamic>? _activeRide;
+
+  // Passenger requests for the active ride.
   List<Map<String, dynamic>> _requests = [];
+
   bool _isLoading = true;
 
   @override
@@ -44,9 +61,11 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // PASSENGER PROFILE PICTURES
   // ---------------------------------------------------------------
 
+  // Looks up a passenger's profile picture URL and stores it in the cache.
   Future<void> _loadPassengerProfileImage(Map<String, dynamic> request) async {
     final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
 
+    // Skip if the ID is invalid, or the image is already cached/loading.
     if (passengerId == null ||
         _passengerImageUrls.containsKey(passengerId) ||
         _loadingPassengerImages.contains(passengerId)) {
@@ -65,6 +84,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
           ? Map<String, dynamic>.from(nestedUser)
           : response;
 
+      // Returns the first non-empty value found under any of the [keys],
+      // or null if none of them has a usable value.
       String? readText(List<String> keys) {
         for (final key in keys) {
           final value = profile[key]?.toString().trim();
@@ -112,6 +133,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
       if (!mounted) return;
 
+      // Cache "no image" so we don't keep retrying a failed lookup.
       setState(() {
         _passengerImageUrls[passengerId] = null;
       });
@@ -124,6 +146,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // LOAD ACTIVE RIDE AND REQUESTS
   // ---------------------------------------------------------------
 
+  // Loads the current user, their active ride and its passenger requests.
   Future<void> _loadRideRequests() async {
     setState(() {
       _isLoading = true;
@@ -135,6 +158,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
       if (!mounted) return;
 
+      // No active ride: clear everything and show the "No Active Ride" state.
       if (ride == null) {
         setState(() {
           _currentUser = user;
@@ -175,6 +199,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     }
   }
 
+  // Reloads only the passenger requests (without the full-screen spinner).
+  // Falls back to a full reload if there is no active ride yet.
   Future<void> _refreshRequests() async {
     if (_activeRide == null) {
       await _loadRideRequests();
@@ -206,6 +232,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // ACCEPT OR REJECT PASSENGER
   // ---------------------------------------------------------------
 
+  // Accepts a passenger's request, then refreshes the list.
   Future<void> _acceptPassenger(Map<String, dynamic> request) async {
     final rideId = int.tryParse(_activeRide?['rideId'].toString() ?? '');
 
@@ -234,6 +261,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     }
   }
 
+  // Rejects a passenger's request, then refreshes the list.
   Future<void> _rejectPassenger(Map<String, dynamic> request) async {
     final rideId = int.tryParse(_activeRide?['rideId'].toString() ?? '');
 
@@ -267,7 +295,9 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // OPEN MESSAGES
   // ---------------------------------------------------------------
 
+  // Opens the conversation with a passenger for the active ride.
   void _openMessageScreen(Map<String, dynamic> request) {
+    // The current user is needed to tell sent messages from received ones.
     if (_currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -304,6 +334,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // RIDE DATE
   // ---------------------------------------------------------------
 
+  // Formats the active ride's date as "dd/mm/yyyy at HH:mm" in local time.
+  // Returns "Unknown date" if it is missing or can't be parsed.
   String _formatRideDate() {
     if (_activeRide == null || _activeRide!['scheduledFor'] == null) {
       return 'Unknown date';
@@ -342,6 +374,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         ),
         centerTitle: true,
         actions: [
+          // Refresh button (disabled while loading).
           IconButton(
             onPressed: _isLoading ? null : _loadRideRequests,
             icon: const Icon(Icons.refresh),
@@ -349,13 +382,18 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
           ),
         ],
       ),
+      // Spinner while loading, otherwise the map and requests.
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _buildContent(colorScheme),
     );
   }
 
+  // Builds the page content: an empty message when there is no active ride,
+  // otherwise the map with a draggable bottom sheet of ride details and
+  // passenger requests.
   Widget _buildContent(ColorScheme colorScheme) {
+    // No active ride: tell the driver to create one first.
     if (_activeRide == null) {
       return Center(
         child: Padding(
@@ -394,19 +432,23 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         // MAP
         Positioned.fill(
           child: MapLibreMap(
+            // Start centred on the Tyger Valley area.
             initialCameraPosition: const CameraPosition(
               target: LatLng(-33.88, 18.63),
               zoom: 11,
             ),
+            // Free OpenFreeMap "bright" map style.
             styleString: 'https://tiles.openfreemap.org/styles/bright',
 
             // Keep attribution away from the message buttons.
             attributionButtonPosition: AttributionButtonPosition.topRight,
             attributionButtonMargins: const math.Point(8, 8),
 
+            // Keep a reference to the map controller.
             onMapCreated: (controller) {
               _mapController = controller;
             },
+            // Once the style is loaded, draw the ride's route.
             onStyleLoadedCallback: () {
               _mapStyleLoaded = true;
               _drawActiveRideRoute();
@@ -415,6 +457,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         ),
 
         // BOTTOM SHEET
+        // Drag handle snaps between 25%, 45% and 85% of the screen height.
         DraggableScrollableSheet(
           initialChildSize: 0.45,
           minChildSize: 0.25,
@@ -437,6 +480,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                 ],
               ),
               child: ListView(
+                // The sheet's scroll controller lets the list and the sheet
+                // drag together.
                 controller: scrollController,
                 padding: EdgeInsets.zero,
                 children: [
@@ -502,6 +547,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                   const Divider(height: 25),
 
                   // REQUEST HEADING
+                  // Title with a pill showing how many requests there are.
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                     child: Row(
@@ -536,6 +582,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                   ),
 
                   // REQUEST LIST
+                  // Empty message, or one card per passenger request.
                   if (_requests.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(30),
@@ -585,6 +632,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // RIDE INFORMATION ROW
   // ---------------------------------------------------------------
 
+  // One "icon + bold title + value" row in the ride information section.
   Widget _buildRideInfo({
     required IconData icon,
     required String title,
@@ -618,10 +666,13 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // DRAW ACTIVE RIDE ROUTE
   // ---------------------------------------------------------------
 
+  // Draws the active ride on the map: a blue pickup marker, a red
+  // destination marker and a green line along the driving route.
   Future<void> _drawActiveRideRoute() async {
     final ride = _activeRide;
     final controller = _mapController;
 
+    // Nothing to draw until the ride and the map are both ready.
     if (ride == null || controller == null || !_mapStyleLoaded) {
       return;
     }
@@ -637,6 +688,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
       ride['destinationLongitude']?.toString() ?? '',
     );
 
+    // Stop if any coordinate is missing or invalid.
     if (pickupLat == null ||
         pickupLon == null ||
         destinationLat == null ||
@@ -646,6 +698,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     }
 
     try {
+      // Remove anything drawn previously.
       await controller.clearCircles();
       await controller.clearLines();
 
@@ -656,10 +709,12 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         endLon: destinationLon,
       );
 
+      // The screen or map may have changed while waiting for the route.
       if (!mounted || _mapController != controller || !_mapStyleLoaded) {
         return;
       }
 
+      // Convert the route's [longitude, latitude] pairs into map points.
       final points = route.coordinates.map((coordinate) {
         return LatLng(coordinate[1], coordinate[0]);
       }).toList();
@@ -668,6 +723,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         throw Exception('The route contains no coordinates.');
       }
 
+      // Blue marker: pickup.
       await controller.addCircle(
         CircleOptions(
           geometry: LatLng(pickupLat, pickupLon),
@@ -678,6 +734,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         ),
       );
 
+      // Red marker: destination.
       await controller.addCircle(
         CircleOptions(
           geometry: LatLng(destinationLat, destinationLon),
@@ -688,6 +745,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
         ),
       );
 
+      // Green line: the route itself.
       await controller.addLine(
         LineOptions(
           geometry: points,
@@ -723,6 +781,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // PASSENGER CARD
   // ---------------------------------------------------------------
 
+  // Builds the card for one passenger request: picture, name, status and
+  // the accept / reject / message buttons.
   Widget _buildPassengerCard(
     BuildContext context,
     Map<String, dynamic> request,
@@ -731,11 +791,14 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
 
     final passengerName = request['passengerName']?.toString() ?? 'Passenger';
 
+    // Requests without a status are treated as pending.
     final status = request['status']?.toString() ?? 'pending';
     final isPending = status == 'pending';
 
     final passengerId = int.tryParse(request['passengerId']?.toString() ?? '');
 
+    // Start loading the passenger's picture the first time this card is
+    // built (it is cached, so later builds skip this).
     if (passengerId != null &&
         !_passengerImageUrls.containsKey(passengerId) &&
         !_loadingPassengerImages.contains(passengerId)) {
@@ -756,6 +819,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
             // PASSENGER INFORMATION
             Row(
               children: [
+                // Profile picture, or a person icon if none/failed to load.
                 CircleAvatar(
                   radius: 25,
                   backgroundColor: colorScheme.primaryContainer,
@@ -788,6 +852,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                // Name and a short description of the request.
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -819,6 +884,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
             const SizedBox(height: 14),
 
             // ACCEPT AND REJECT BUTTONS
+            // Only shown while the request is still pending.
             if (isPending)
               Row(
                 children: [
@@ -845,6 +911,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
               ),
 
             // MESSAGE BUTTON FOR ACCEPTED OR OTHER REQUESTS
+            // Filled button once the request is no longer pending.
             if (!isPending)
               SizedBox(
                 width: double.infinity,
@@ -859,6 +926,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
               ),
 
             // MESSAGE BUTTON FOR PENDING REQUESTS
+            // Outlined button shown under Accept / Reject while pending.
             if (isPending) ...[
               const SizedBox(height: 10),
               SizedBox(
@@ -883,6 +951,7 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
   // REQUEST STATUS BADGE
   // ---------------------------------------------------------------
 
+  // Small rounded label showing the request's status.
   Widget _buildStatusBadge(String status, ColorScheme colorScheme) {
     final displayStatus = _formatStatus(status);
 
@@ -903,6 +972,8 @@ class _FindPassengerScreenState extends State<FindPassengerScreen> {
     );
   }
 
+  // Converts a status value from the backend into display text.
+  // Anything unrecognised is shown as "Pending".
   String _formatStatus(String status) {
     switch (status) {
       case 'accepted':

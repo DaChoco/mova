@@ -3,6 +3,8 @@ import 'package:mova/config/app_config.dart';
 
 import 'services/auth_service.dart';
 
+// Lists the rides created by the logged-in driver and lets them delete
+// or finish each one.
 class MyRidesScreen extends StatefulWidget {
   const MyRidesScreen({super.key});
 
@@ -15,9 +17,13 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     baseUrl: AppConfig.backendBaseUrl,
   );
 
+  // Rides returned by the backend.
   List<Map<String, dynamic>> _rides = [];
 
   bool _isLoading = true;
+
+  // ID of the ride currently being deleted/finished (null when idle).
+  // Used to disable the buttons and show a spinner.
   int? _deletingRideId;
 
   @override
@@ -26,12 +32,15 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     _loadRides();
   }
 
+  // Shows an error (or any object's text) in a snack bar, removing the
+  // "Exception: " prefix so the message reads cleanly.
   void _showMessage(Object e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
     );
   }
 
+  // Loads the driver's rides from the backend.
   Future<void> _loadRides() async {
     try {
       final rides = await _authService.getMyRides();
@@ -50,9 +59,11 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     }
   }
 
+  // Asks for confirmation, then permanently deletes the ride.
   Future<void> _deleteRide(Map<String, dynamic> ride) async {
     final rideId = int.parse(ride['rideId'].toString());
 
+    // Confirmation dialog: returns true only if the user taps "Delete".
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -73,8 +84,10 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
       ),
     );
 
+    // Cancelled or dismissed.
     if (confirmed != true) return;
 
+    // Mark this ride as busy so the buttons are disabled.
     setState(() => _deletingRideId = rideId);
 
     try {
@@ -82,6 +95,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
 
       if (!mounted) return;
 
+      // Remove the ride from the list without reloading everything.
       setState(() {
         _rides.removeWhere((r) => r['rideId'].toString() == '$rideId');
       });
@@ -93,13 +107,16 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
 
       _showMessage(e);
     } finally {
+      // Always clear the busy state.
       if (mounted) setState(() => _deletingRideId = null);
     }
   }
 
+  // Asks for confirmation, then marks the ride as completed.
   Future<void> _finishRide(Map<String, dynamic> ride) async {
     final rideId = int.parse(ride['rideId'].toString());
 
+    // Confirmation dialog: returns true only if the user taps "Complete Ride".
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -122,8 +139,10 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
       ),
     );
 
+    // Cancelled or dismissed.
     if (confirmed != true) return;
 
+    // Mark this ride as busy so the buttons are disabled.
     setState(() => _deletingRideId = rideId);
 
     try {
@@ -132,6 +151,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
 
       if (!mounted) return;
 
+      // Remove the ride from the list without reloading everything.
       setState(() {
         _rides.removeWhere((r) => r['rideId'].toString() == '$rideId');
       });
@@ -143,15 +163,19 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
 
       _showMessage(e);
     } finally {
+      // Always clear the busy state.
       if (mounted) setState(() => _deletingRideId = null);
     }
   }
 
+  // Formats a scheduled date as "dd/mm/yyyy at HH:mm" in local time.
+  // Returns "Unknown time" if the value can't be parsed.
   String _formatScheduled(dynamic scheduledFor) {
     final date = DateTime.tryParse('$scheduledFor')?.toLocal();
 
     if (date == null) return 'Unknown time';
 
+    // Pads a number to two digits (e.g. 5 -> "05").
     String two(int n) => n.toString().padLeft(2, '0');
 
     return '${two(date.day)}/${two(date.month)}/${date.year} '
@@ -168,11 +192,13 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
         ),
         centerTitle: true,
       ),
+      // Spinner while loading, otherwise a pull-to-refresh list of rides.
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadRides,
               child: ListView(
+                // Always scrollable so pull-to-refresh works on an empty list.
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
                 children: _rides.isEmpty
@@ -185,11 +211,14 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     );
   }
 
+  // Builds the card for a single ride with its details and action buttons.
   Widget _buildRideCard(BuildContext context, Map<String, dynamic> ride) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    // True when this specific ride is the one being deleted/finished.
     final isDeleting = _deletingRideId.toString() == ride['rideId'].toString();
 
+    // Helper that builds one "icon + bold label + value" row.
     Widget line(IconData icon, String label, String value) => Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
@@ -230,26 +259,31 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
             'Your Ride',
             style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
+          // Pickup address.
           line(
             Icons.location_on_outlined,
             'Pickup',
             ride['pickupAddress']?.toString() ?? 'Unknown',
           ),
+          // Destination address.
           line(
             Icons.school_outlined,
             'Destination',
             ride['destinationAddress']?.toString() ?? 'Unknown',
           ),
+          // Date and time of the ride.
           line(
             Icons.access_time_outlined,
             'Scheduled',
             _formatScheduled(ride['scheduledFor']),
           ),
+          // Seats still available.
           line(
             Icons.people_outline,
             'Seats',
             '${ride['availableSeats'] ?? 'Unknown'} available',
           ),
+          // Number of accepted and pending passenger requests.
           line(
             Icons.how_to_reg_outlined,
             'Passengers',
@@ -263,6 +297,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
+                  // Disabled while any ride is being deleted/finished.
                   onPressed: _deletingRideId != null
                       ? null
                       : () => _deleteRide(ride),
@@ -270,6 +305,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
                     foregroundColor: Colors.red,
                     minimumSize: const Size(0, 46),
                   ),
+                  // Show a spinner on this card while it is being deleted.
                   icon: isDeleting
                       ? const SizedBox(
                           width: 18,
@@ -284,6 +320,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
 
               Expanded(
                 child: OutlinedButton.icon(
+                  // Disabled while any ride is being deleted/finished.
                   onPressed: _deletingRideId != null
                       ? null
                       : () => _finishRide(ride),
@@ -302,6 +339,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     );
   }
 
+  // Placeholder shown when the driver hasn't created any rides yet.
   Widget _buildEmptyState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -309,6 +347,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
       padding: const EdgeInsets.only(top: 120),
       child: Column(
         children: [
+          // Circular icon badge.
           Container(
             width: 90,
             height: 90,

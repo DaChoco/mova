@@ -9,6 +9,9 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'config/app_config.dart';
 import '../services/auth_service.dart';
 
+// Screen where a driver creates a ride: pick a pickup point (GPS or map tap),
+// choose a date, time and number of seats. The destination is always the
+// Eduvos Tygervalley campus.
 class CreateRideScreen extends StatefulWidget {
   const CreateRideScreen({super.key});
 
@@ -17,16 +20,21 @@ class CreateRideScreen extends StatefulWidget {
 }
 
 class _CreateRideScreenState extends State<CreateRideScreen> {
+  // Mova brand colour.
   static const Color _movaGreen = Color(0xFF0F6E56);
 
+  // Read-only text box showing the chosen pickup.
   final TextEditingController _startLocationController =
       TextEditingController();
 
+  // Fixed destination coordinates (the campus).
   static const LatLng _destinationLocation = LatLng(-33.8709, 18.6402);
 
+  // Fixed destination address text.
   static const String _destination =
       'Eduvos Tygervalley, 9 Rogers St, Tyger Valley';
 
+  // Disabled text box that displays the fixed destination.
   final TextEditingController _destinationController = TextEditingController(
     text: _destination,
   );
@@ -35,32 +43,43 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     baseUrl: AppConfig.backendBaseUrl,
   );
 
+  // Chosen ride date and time (null until the user picks them).
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
+  // Number of passenger seats offered (1 to 8).
   int _availableSeats = 1;
 
+  // Chosen pickup coordinates (null until selected).
   LatLng? _pickupLocation;
 
+  // Loading flags used to disable buttons and show spinners.
   bool _isCreatingRide = false;
   bool _isGettingLocation = false;
+
+  // True once the map style has finished loading (markers can be drawn).
   bool _mapStyleLoaded = false;
 
   MapLibreMapController? _mapController;
+
+  // The red dot currently marking the pickup on the map.
   Circle? _pickupCircle;
 
   @override
   void dispose() {
+    // Release the text controllers.
     _startLocationController.dispose();
     _destinationController.dispose();
     super.dispose();
   }
 
+  // Formats coordinates as "lat, lng" with 5 decimal places.
   String _coordinatesLabel(LatLng coordinates) {
     return '${coordinates.latitude.toStringAsFixed(5)}, '
         '${coordinates.longitude.toStringAsFixed(5)}';
   }
 
+  // Shows a floating snack bar, with an optional action button.
   void _showMessage(
     String message, {
     String? actionLabel,
@@ -73,6 +92,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         content: Text(message),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        // Only add the action button when both a label and callback exist.
         action: actionLabel != null && onAction != null
             ? SnackBarAction(label: actionLabel, onPressed: onAction)
             : null,
@@ -80,6 +100,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     );
   }
 
+  // Saves the chosen pickup, updates the text box and map marker, and
+  // tells the user. [fromGps] changes the wording used.
   Future<void> _selectPickupLocation(
     LatLng coordinates, {
     bool fromGps = false,
@@ -104,17 +126,21 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     );
   }
 
+  // Moves the red pickup marker on the map to the given coordinates.
   Future<void> _updatePickupMarker(LatLng coordinates) async {
     final controller = _mapController;
 
+    // Nothing to do until the map is ready.
     if (controller == null || !_mapStyleLoaded) return;
 
     try {
+      // Remove the old marker first so only one is ever shown.
       if (_pickupCircle != null) {
         await controller.removeCircle(_pickupCircle!);
         _pickupCircle = null;
       }
 
+      // Red circle with a white outline.
       _pickupCircle = await controller.addCircle(
         CircleOptions(
           geometry: coordinates,
@@ -129,6 +155,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
+  // Clears the chosen pickup and removes its marker from the map.
   Future<void> _clearPickupLocation() async {
     setState(() {
       _pickupLocation = null;
@@ -148,12 +175,16 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
+  // Uses the phone's GPS as the pickup location, after checking that
+  // location services are on and permission has been granted.
   Future<void> _useMyLocation() async {
+    // Ignore taps while a location request is already running.
     if (_isGettingLocation) return;
 
     setState(() => _isGettingLocation = true);
 
     try {
+      // 1. Is GPS turned on?
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
@@ -162,6 +193,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         );
       }
 
+      // 2. Do we have permission? Ask if we haven't yet.
       LocationPermission permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
@@ -174,6 +206,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         );
       }
 
+      // Permanently denied: the user must change it in phone settings.
       if (permission == LocationPermission.deniedForever) {
         throw Exception(
           'Location permission is permanently denied. Enable it in your '
@@ -181,6 +214,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         );
       }
 
+      // 3. Get the current position at high accuracy.
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -195,6 +229,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
 
       final controller = _mapController;
 
+      // Zoom the map in on the user's location.
       if (controller != null && _mapStyleLoaded) {
         await controller.animateCamera(
           CameraUpdate.newCameraPosition(
@@ -207,6 +242,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
 
       final message = e.toString().replaceFirst('Exception: ', '');
 
+      // For permanent denial, offer a "Settings" button that opens the
+      // app's system settings page.
       _showMessage(
         message,
         actionLabel: message.contains('permanently denied') ? 'Settings' : null,
@@ -215,17 +252,21 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
             : null,
       );
     } finally {
+      // Re-enable the button.
       if (mounted) {
         setState(() => _isGettingLocation = false);
       }
     }
   }
 
+  // Opens the date picker. Only today up to one year ahead can be chosen.
   Future<void> _selectDate() async {
     final today = DateTime.now();
 
     final pickedDate = await showDatePicker(
       context: context,
+      // Start on the previously chosen date if it is still today or later;
+      // otherwise start on today.
       initialDate:
           _selectedDate != null &&
               !_selectedDate!.isBefore(
@@ -242,6 +283,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
+  // Opens the time picker, starting at the previous choice or the current time.
   Future<void> _selectTime() async {
     final pickedTime = await showTimePicker(
       context: context,
@@ -253,9 +295,12 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
+  // Validates the form and sends the new ride to the backend.
   Future<void> _createRide() async {
+    // Ignore taps while a request is already running.
     if (_isCreatingRide) return;
 
+    // Make sure a pickup, date and time have all been chosen.
     if (_pickupLocation == null) {
       _showMessage('Please use GPS or select a pickup on the map.');
       return;
@@ -271,6 +316,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       return;
     }
 
+    // Combine the chosen date and time into one DateTime.
     final scheduledFor = DateTime(
       _selectedDate!.year,
       _selectedDate!.month,
@@ -279,6 +325,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       _selectedTime!.minute,
     );
 
+    // The ride must be in the future.
     if (!scheduledFor.isAfter(DateTime.now())) {
       _showMessage('Please choose a future date and time for the ride.');
       return;
@@ -301,18 +348,22 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       if (!mounted) return;
 
       _showMessage('Ride created successfully!');
+
+      // Close this screen and tell the previous one a ride was created.
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
 
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     } finally {
+      // Re-enable the create button.
       if (mounted) {
         setState(() => _isCreatingRide = false);
       }
     }
   }
 
+  // Shared styling for text fields on this screen.
   InputDecoration _inputDecoration({
     required String label,
     required IconData icon,
@@ -330,20 +381,24 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       filled: filled,
       fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      // No outline by default...
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
       ),
+      // ...a faint outline when enabled...
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide(
           color: scheme.outlineVariant.withValues(alpha: 0.55),
         ),
       ),
+      // ...a green outline when focused...
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(color: _movaGreen, width: 1.5),
       ),
+      // ...and a fainter outline when the field is disabled.
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide(
@@ -353,6 +408,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     );
   }
 
+  // Builds a rounded card with an icon, title and subtitle at the top and
+  // the given [children] underneath. Used to group related inputs.
   Widget _buildSection({
     required String title,
     required String subtitle,
@@ -382,6 +439,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Card header: icon badge + title and subtitle.
           Row(
             children: [
               Container(
@@ -419,12 +477,15 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
             ],
           ),
           const SizedBox(height: 20),
+          // The section's content.
           ...children,
         ],
       ),
     );
   }
 
+  // A tappable row (used for date and time) that shows the chosen [value],
+  // or "Select <title>" while nothing has been chosen yet.
   Widget _buildSelectionTile({
     required IconData icon,
     required String title,
@@ -456,6 +517,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Small label above the value.
                     Text(
                       title,
                       style: TextStyle(
@@ -464,6 +526,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                       ),
                     ),
                     const SizedBox(height: 5),
+                    // Chosen value, or a dimmed placeholder.
                     Text(
                       hasValue ? value : 'Select $title',
                       style: TextStyle(
@@ -477,6 +540,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                   ],
                 ),
               ),
+              // Dropdown arrow hints that the row opens a picker.
               Icon(
                 Icons.keyboard_arrow_down_rounded,
                 color: scheme.onSurface.withValues(alpha: 0.6),
@@ -488,6 +552,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     );
   }
 
+  // Full-width green button. Shows a spinner and "Please wait..." while
+  // [loading] is true. Passing a null [onPressed] disables it.
   Widget _buildPrimaryButton({
     required String label,
     required IconData icon,
@@ -530,12 +596,14 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // Chosen date as dd/mm/yyyy (empty until a date is picked).
     final dateLabel = _selectedDate == null
         ? ''
         : '${_selectedDate!.day.toString().padLeft(2, '0')}/'
               '${_selectedDate!.month.toString().padLeft(2, '0')}/'
               '${_selectedDate!.year}';
 
+    // Chosen time formatted for the device's 12/24-hour setting.
     final timeLabel = _selectedTime?.format(context) ?? '';
 
     return Scaffold(
@@ -614,6 +682,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               subtitle: 'Where should your passengers meet you?',
               icon: Icons.location_on_outlined,
               children: [
+                // Read-only box showing the selected pickup, with a clear
+                // button once one has been chosen.
                 TextField(
                   controller: _startLocationController,
                   readOnly: true,
@@ -631,6 +701,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                // "Use My Location" button (disabled while locating).
                 SizedBox(
                   width: double.infinity,
                   height: 49,
@@ -678,18 +749,23 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                     child: Stack(
                       children: [
                         MapLibreMap(
+                          // Start centred on the Tyger Valley area.
                           initialCameraPosition: const CameraPosition(
                             target: LatLng(-33.88, 18.63),
                             zoom: 11.5,
                           ),
+                          // Free OpenFreeMap "bright" map style.
                           styleString:
                               'https://tiles.openfreemap.org/styles/bright',
                           attributionButtonPosition:
                               AttributionButtonPosition.topRight,
                           attributionButtonMargins: const math.Point(8, 8),
+                          // Keep a reference to the map controller.
                           onMapCreated: (controller) {
                             _mapController = controller;
                           },
+                          // Once the style is loaded, draw the pickup marker
+                          // if a pickup was already chosen.
                           onStyleLoadedCallback: () {
                             _mapStyleLoaded = true;
 
@@ -698,15 +774,21 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                               _updatePickupMarker(pickup);
                             }
                           },
+                          // Tapping the map selects that point as the pickup.
                           onMapClick: (point, coordinates) {
                             _selectPickupLocation(coordinates);
                           },
+                          // Let the map take priority over the page scroll
+                          // so dragging the map doesn't scroll the screen.
                           gestureRecognizers: {
                             Factory<OneSequenceGestureRecognizer>(
                               () => EagerGestureRecognizer(),
                             ),
                           },
                         ),
+                        // Small info card at the bottom of the map showing
+                        // the selected coordinates. IgnorePointer lets taps
+                        // pass through to the map underneath.
                         if (_pickupLocation != null)
                           Positioned(
                             left: 12,
@@ -785,6 +867,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               subtitle: 'Your ride ends at the campus',
               icon: Icons.school_outlined,
               children: [
+                // Disabled field: the destination can't be edited.
                 TextField(
                   controller: _destinationController,
                   enabled: false,
@@ -794,6 +877,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                // Note explaining that the destination is fixed.
                 Container(
                   padding: const EdgeInsets.all(13),
                   decoration: BoxDecoration(
@@ -826,6 +910,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               subtitle: 'When are you leaving?',
               icon: Icons.calendar_month_outlined,
               children: [
+                // Date picker row.
                 _buildSelectionTile(
                   icon: Icons.calendar_today_outlined,
                   title: 'Date of ride',
@@ -833,6 +918,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                   onTap: _selectDate,
                 ),
                 const SizedBox(height: 13),
+                // Time picker row.
                 _buildSelectionTile(
                   icon: Icons.access_time_rounded,
                   title: 'Departure time',
@@ -848,6 +934,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               subtitle: 'Set how many passengers you can take',
               icon: Icons.groups_outlined,
               children: [
+                // Seat counter: [-] number [+]
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 13,
@@ -886,6 +973,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                               style: TextStyle(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 3),
+                            // Singular/plural wording: "1 passenger",
+                            // "2 passengers", etc.
                             Text(
                               '$_availableSeats passenger'
                               '${_availableSeats == 1 ? '' : 's'}',
@@ -897,6 +986,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                           ],
                         ),
                       ),
+                      // Minus button (disabled at the minimum of 1).
                       IconButton(
                         tooltip: 'Remove seat',
                         onPressed: _availableSeats > 1
@@ -905,6 +995,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                         icon: const Icon(Icons.remove_circle_outline_rounded),
                         color: _movaGreen,
                       ),
+                      // Current seat count.
                       Container(
                         constraints: const BoxConstraints(minWidth: 24),
                         alignment: Alignment.center,
@@ -916,6 +1007,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                           ),
                         ),
                       ),
+                      // Plus button (disabled at the maximum of 8).
                       IconButton(
                         tooltip: 'Add seat',
                         onPressed: _availableSeats < 8
@@ -947,6 +1039,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               onPressed: _isCreatingRide ? null : _createRide,
             ),
             const SizedBox(height: 12),
+            // Reminder shown under the submit button.
             Center(
               child: Text(
                 'Check your pickup, date, and time before creating your ride.',

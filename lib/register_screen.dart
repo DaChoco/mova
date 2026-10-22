@@ -7,6 +7,7 @@ import 'login_screen.dart';
 import 'models/auth.dart';
 import 'services/auth_service.dart';
 
+// Registration page where new students create a Mova account.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -15,18 +16,24 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  // Key used to validate all form fields at once.
   final _formKey = GlobalKey<FormState>();
 
+  // Controllers that hold the text typed into each field.
   final studentNameController = TextEditingController();
   final studentSurnameController = TextEditingController();
   final studentNumberController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
+  // Whether each password field's text is hidden.
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
+
+  // True while the registration request is running (disables the button).
   bool _isRegistering = false;
 
+  // Mova brand colour.
   static const Color _movaGreen = Color(0xFF0F6E56);
 
   final AuthService _authService = AuthService(
@@ -35,6 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    // Release all text controllers.
     studentNameController.dispose();
     studentSurnameController.dispose();
     studentNumberController.dispose();
@@ -43,7 +51,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  // Validates the form, sends the registration to the backend, then
+  // takes the user to the login screen.
   Future<void> _register() async {
+    // Stop if any field fails validation.
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -71,6 +82,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
+      // Replace this page with the login page.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -78,6 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      // Show the error without the "Exception: " prefix.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -85,6 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } finally {
+      // Re-enable the register button.
       if (mounted) {
         setState(() {
           _isRegistering = false;
@@ -101,6 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final borderRadius = BorderRadius.circular(16);
 
+    // Shared text field styling; each field customises it with copyWith.
     final inputDecoration = InputDecoration(
       filled: true,
       fillColor: colors.surfaceContainerHighest.withAlpha(isDark ? 150 : 100),
@@ -114,18 +129,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         color: colors.onSurfaceVariant.withAlpha(180),
       ),
       prefixIconColor: colors.primary,
+      // No outline by default...
       border: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: BorderSide.none,
       ),
+      // ...a faint outline when enabled...
       enabledBorder: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: BorderSide(color: colors.outlineVariant.withAlpha(130)),
       ),
+      // ...a green outline when focused...
       focusedBorder: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: const BorderSide(color: _movaGreen, width: 1.8),
       ),
+      // ...and red outlines when the field has a validation error.
       errorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: BorderSide(color: colors.error),
@@ -140,6 +159,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       backgroundColor: colors.surface,
       body: Container(
         width: double.infinity,
+        // Soft green tint fading out towards the bottom of the screen.
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -153,6 +173,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         child: SafeArea(
+          // LayoutBuilder gives the available height so the content can be
+          // vertically centred but still scroll on small screens.
           child: LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
@@ -161,10 +183,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   vertical: 28,
                 ),
                 child: ConstrainedBox(
+                  // Minimum height = screen height minus the vertical padding.
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight - 56,
                   ),
                   child: Center(
+                    // Limit the width on large screens (tablets, web).
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 440),
                       child: Form(
@@ -274,6 +298,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   TextFormField(
                                     controller: studentNameController,
                                     keyboardType: TextInputType.text,
+                                    // Capitalise the first letter of each word.
                                     textCapitalization:
                                         TextCapitalization.words,
                                     style: TextStyle(
@@ -287,6 +312,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         Icons.person_outline_rounded,
                                       ),
                                     ),
+                                    // Allows 2-60 letters (including accented
+                                    // letters), spaces, apostrophes and hyphens.
+                                    // Note: the error messages below say
+                                    // "surname" even though this is the name
+                                    // field (left unchanged).
                                     validator: (value) {
                                       final regularExpression = RegExp(
                                         r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
@@ -311,6 +341,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   TextFormField(
                                     controller: studentSurnameController,
                                     keyboardType: TextInputType.text,
+                                    // Capitalise the first letter of each word.
                                     textCapitalization:
                                         TextCapitalization.words,
                                     style: TextStyle(
@@ -324,6 +355,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         Icons.badge_outlined,
                                       ),
                                     ),
+                                    // Same rules as the name field: 2-60 letters,
+                                    // spaces, apostrophes and hyphens.
                                     validator: (value) {
                                       final regularExpression = RegExp(
                                         r"^[a-zA-ZÀ-ÿ' -]{2,60}$",
@@ -359,6 +392,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         Icons.school_outlined,
                                       ),
                                     ),
+                                    // Accepts "EDUV" followed by 7 digits, or
+                                    // any 9 letters/digits (case-insensitive).
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'Please enter your student number';
@@ -393,6 +428,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       prefixIcon: const Icon(
                                         Icons.lock_outline_rounded,
                                       ),
+                                      // Eye icon toggles password visibility.
                                       suffixIcon: IconButton(
                                         tooltip: _hidePassword
                                             ? 'Show password'
@@ -409,6 +445,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         },
                                       ),
                                     ),
+                                    // Only checks that something was entered.
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'Please enter your password';
@@ -434,6 +471,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       prefixIcon: const Icon(
                                         Icons.lock_reset_rounded,
                                       ),
+                                      // Eye icon toggles visibility of this field.
                                       suffixIcon: IconButton(
                                         tooltip: _hideConfirmPassword
                                             ? 'Show password'
@@ -451,6 +489,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         },
                                       ),
                                     ),
+                                    // Must be filled in and match the password.
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'Please confirm your password';
@@ -470,6 +509,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   SizedBox(
                                     height: 56,
                                     child: FilledButton(
+                                      // Disabled while registration is running.
                                       onPressed: _isRegistering
                                           ? null
                                           : _register,
@@ -484,6 +524,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           ),
                                         ),
                                       ),
+                                      // Spinner while registering, otherwise
+                                      // the "Create Account" label with an arrow.
                                       child: _isRegistering
                                           ? const SizedBox(
                                               width: 23,
@@ -531,6 +573,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             color: colors.onSurfaceVariant,
                                           ),
                                         ),
+                                        // Opens the Terms & Conditions page.
                                         TextButton(
                                           onPressed: () {
                                             Navigator.push(
@@ -584,6 +627,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     ),
                                   ),
                                 ),
+                                // Disabled while registering; otherwise opens
+                                // the login page.
                                 TextButton(
                                   onPressed: _isRegistering
                                       ? null

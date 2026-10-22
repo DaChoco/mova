@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 class TermsAndConditionsScreen extends StatelessWidget {
   const TermsAndConditionsScreen({super.key});
 
+  // Brand colour used for accents on this screen.
   static const Color movaGreen = Color(0xFF0F6E56);
 
+  // The terms shown on screen, one entry per numbered section.
   static const List<_TermsSection> sections = [
     _TermsSection(
       title: '1. Introduction',
@@ -77,9 +79,11 @@ class TermsAndConditionsScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
           children: [
+            // Header card with an icon, title and "mock terms" label.
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
+                // Slightly stronger tint in dark mode so it stays visible.
                 color: movaGreen.withValues(alpha: isDark ? 0.18 : 0.08),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: movaGreen.withValues(alpha: 0.22)),
@@ -87,6 +91,7 @@ class TermsAndConditionsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Icon badge.
                   Container(
                     width: 50,
                     height: 50,
@@ -117,6 +122,7 @@ class TermsAndConditionsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  // Label making it clear these are demo terms.
                   const Row(
                     children: [
                       Icon(
@@ -145,8 +151,10 @@ class TermsAndConditionsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
+            // One card per terms section.
             ...sections.map((section) => _TermsSectionCard(section: section)),
             const SizedBox(height: 8),
+            // Demo disclaimer at the bottom of the page.
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -177,13 +185,18 @@ class TermsAndConditionsScreen extends StatelessWidget {
   }
 }
 
+// Simple data holder for one section of the terms.
 class _TermsSection {
+  // Heading, e.g. "1. Introduction".
   final String title;
+
+  // Paragraph of text under the heading.
   final String body;
 
   const _TermsSection({required this.title, required this.body});
 }
 
+// Card that displays a single terms section (title above body text).
 class _TermsSectionCard extends StatelessWidget {
   const _TermsSectionCard({required this.section});
 
@@ -206,6 +219,7 @@ class _TermsSectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Section heading.
           Text(
             section.title,
             style: theme.textTheme.titleMedium?.copyWith(
@@ -213,6 +227,7 @@ class _TermsSectionCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 9),
+          // Section body text.
           Text(
             section.body,
             style: theme.textTheme.bodyMedium?.copyWith(

@@ -17,7 +17,11 @@ import 'create_ride.dart';
 import 'my_rides.dart';
 import 'terms_and_conditions.dart';
 
+// Main screen after login: a welcome banner, action buttons (which differ
+// for drivers and passengers), messages shortcut, upcoming ride card and a
+// side drawer with profile, theme and logout options.
 class HomeScreen extends StatefulWidget {
+  // The logged-in user passed in from the login screen.
   final User user;
 
   const HomeScreen({super.key, required this.user});
@@ -27,6 +31,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Local copy of the user so it can be refreshed after profile changes.
   late User _user;
 
   final AuthService _authService = AuthService(
@@ -35,11 +40,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final chat.ChatService _chatService = chat.ChatService();
 
+  // Mova brand colour.
   static const Color _movaGreen = Color(0xFF0F6E56);
 
+  // The passenger's next accepted ride (null if there isn't one).
   Map<String, dynamic>? _upcomingRide;
   bool _isLoadingRide = true;
+
+  // Total unread messages across all chats (shown as a badge).
   int _unreadMessages = 0;
+
+  // Timer that periodically refreshes the ride and unread count.
   Timer? _rideRefreshTimer;
 
   @override
@@ -48,6 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _user = widget.user;
 
+    // If the user has a profile picture, download it for the avatars;
+    // otherwise fetch the latest user details from the backend.
     if (_user.profileIcon != null && _user.profileIcon!.isNotEmpty) {
       final profileURL =
           '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
@@ -59,8 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUpcomingRide();
     _loadUnreadMessages();
 
+    // Update the unread badge whenever chats change.
     chat.chatsChanged.addListener(_loadUnreadMessages);
 
+    // Refresh the upcoming ride and unread count every 30 seconds.
     _rideRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadUpcomingRide();
       _loadUnreadMessages();
@@ -69,11 +84,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    // Stop the timer and listener so they don't run after this screen closes.
     _rideRefreshTimer?.cancel();
     chat.chatsChanged.removeListener(_loadUnreadMessages);
     super.dispose();
   }
 
+  // Loads the user's accepted upcoming ride from the backend.
   Future<void> _loadUpcomingRide() async {
     try {
       final ride = await _authService.getAcceptedRide();
@@ -87,10 +104,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (!mounted) return;
 
+      // On failure just stop the spinner; any previous ride stays shown.
       setState(() => _isLoadingRide = false);
     }
   }
 
+  // Loads the total number of unread messages for the Messages badge.
   Future<void> _loadUnreadMessages() async {
     try {
       final total = await _chatService.getUnreadTotal();
@@ -103,18 +122,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Formats a scheduled date as "dd/mm/yyyy at HH:mm" in local time.
+  // Returns "Unknown time" if the value can't be parsed.
   String _formatScheduled(dynamic scheduledFor) {
     final date = DateTime.tryParse('$scheduledFor')?.toLocal();
 
     if (date == null) return 'Unknown time';
 
+    // Pads a number to two digits (e.g. 5 -> "05").
     String two(int n) => n.toString().padLeft(2, '0');
 
     return '${two(date.day)}/${two(date.month)}/${date.year} '
         'at ${two(date.hour)}:${two(date.minute)}';
   }
 
+  // Builds the content of the "Upcoming Ride" card: a spinner while loading,
+  // an empty message if there is no ride, otherwise the ride's details.
   Widget _buildUpcomingRide(ColorScheme colorScheme) {
+    // Loading state.
     if (_isLoadingRide) {
       return const Center(
         child: Padding(
@@ -126,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final ride = _upcomingRide;
 
+    // Empty state: no accepted ride yet.
     if (ride == null) {
       return Center(
         child: Padding(
@@ -171,10 +197,12 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    // Pull the display values out of the ride, with fallbacks.
     final pickup = ride['pickupAddress']?.toString() ?? 'Unknown pickup';
     final destination =
         ride['destinationAddress']?.toString() ?? 'Unknown destination';
 
+    // Helper that builds one "icon + text" row.
     Widget line(IconData icon, String text) {
       return Padding(
         padding: const EdgeInsets.only(top: 10),
@@ -201,6 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // "Request accepted" pill.
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
           decoration: BoxDecoration(
@@ -224,12 +253,14 @@ class _HomeScreenState extends State<HomeScreen> {
           Icons.access_time_outlined,
           _formatScheduled(ride['scheduledFor']),
         ),
+        // Only show the driver row when the backend supplied a name.
         if (ride['driverName'] != null)
           line(Icons.person_outline, 'Driver: ${ride['driverName']}'),
       ],
     );
   }
 
+  // Fetches the latest user details and refreshes the profile picture.
   Future<void> _refreshUser() async {
     try {
       final updatedUser = await _authService.getUser();
@@ -253,6 +284,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Logs the user out, clears the cached profile image and returns to the
+  // login screen, removing all earlier screens from the back stack.
   Future<void> _logout() async {
     await _authService.logout();
 
@@ -267,6 +300,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Builds a full-width action button. The [primary] one is filled green;
+  // the others are outlined.
   Widget _buildActionButton({
     required BuildContext context,
     required IconData icon,
@@ -280,6 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity,
       height: 62,
       child: primary
+          // Filled (primary) style.
           ? FilledButton.icon(
               onPressed: onPressed,
               icon: Icon(icon, size: 23),
@@ -299,6 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             )
+          // Outlined (secondary) style.
           : OutlinedButton.icon(
               onPressed: onPressed,
               icon: Icon(icon, size: 22),
@@ -322,6 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Wraps [child] in a rounded, shadowed card used for the home sections.
   Widget _buildSectionCard({
     required BuildContext context,
     required Widget child,
@@ -354,10 +392,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      // Side drawer: profile header and menu items.
       drawer: Drawer(
         child: SafeArea(
           child: Column(
             children: [
+              // Drawer header with avatar, name and student number.
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
@@ -370,6 +410,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Column(
                   children: [
+                    // Rebuilds the avatar whenever the shared profile image
+                    // changes (see profileImageNotifier).
                     ValueListenableBuilder<Uint8List?>(
                       valueListenable: profileImageNotifier,
                       builder: (context, image, child) {
@@ -387,6 +429,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             backgroundColor: Colors.white.withValues(
                               alpha: 0.15,
                             ),
+                            // Show the photo, or a person icon if none.
                             backgroundImage: image != null
                                 ? MemoryImage(image)
                                 : null,
@@ -427,6 +470,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 10),
 
+              // Edit Profile: opens the profile screen, then refreshes the
+              // user details when returning.
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
                 title: const Text(
@@ -437,6 +482,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 onTap: () async {
+                  // Short delay so the tap ripple is visible first.
                   await Future.delayed(const Duration(milliseconds: 150));
 
                   if (!context.mounted) return;
@@ -452,6 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
+              // My Rides: only available to drivers.
               if (_user.isDriver)
                 ListTile(
                   leading: const Icon(Icons.directions_car_outlined),
@@ -472,6 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
+              // Dark mode switch, linked to the global theme notifier.
               ValueListenableBuilder<bool>(
                 valueListenable: themeModeNotifier,
                 builder: (context, isDarkMode, child) {
@@ -490,6 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
+              // Terms & Conditions: closes the drawer, then opens the page.
               ListTile(
                 leading: const Icon(Icons.description_outlined),
                 title: const Text(
@@ -511,6 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
+              // Logout, shown in the error (red) colour.
               ListTile(
                 leading: const Icon(Icons.logout_rounded),
                 title: const Text(
@@ -522,8 +572,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: _logout,
               ),
 
+              // Pushes the footer to the bottom of the drawer.
               const Spacer(),
 
+              // Drawer footer with the app name.
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: Row(
@@ -552,6 +604,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
 
+      // App bar with the title and the user's avatar on the right.
       appBar: AppBar(
         title: const Text(
           'Mova',
@@ -589,6 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       body: Container(
+        // Faint green tint fading out near the top of the page.
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -600,10 +654,12 @@ class _HomeScreenState extends State<HomeScreen> {
             stops: const [0.0, 0.38],
           ),
         ),
+        // Pull to refresh the upcoming ride and unread count together.
         child: RefreshIndicator(
           onRefresh: () =>
               Future.wait([_loadUpcomingRide(), _loadUnreadMessages()]),
           child: SingleChildScrollView(
+            // Always scrollable so pull-to-refresh works on short content.
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
             child: Column(
@@ -645,6 +701,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 9),
+                            // Personal greeting using the user's first name.
                             Text(
                               'Hey, ${_user.firstName}!',
                               maxLines: 2,
@@ -669,6 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      // Decorative car icon in a translucent circle.
                       Container(
                         width: 66,
                         height: 66,
@@ -700,6 +758,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 5),
 
+                // Subtitle depends on whether the user is a driver.
                 Text(
                   _user.isDriver
                       ? 'Find passengers or organise your next ride.'
@@ -713,6 +772,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 18),
 
+                // Drivers get three actions; passengers get a single
+                // "Find Rides" button.
                 if (_user.isDriver) ...[
                   _buildActionButton(
                     context: context,
@@ -781,6 +842,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(15),
+                      // Opens the chat list, then refreshes the unread count
+                      // when the user comes back.
                       onTap: () {
                         Navigator.push(
                           context,
@@ -834,6 +897,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                           ),
+                          // Unread count badge (only when there are unread
+                          // messages).
                           if (_unreadMessages > 0) ...[
                             UnreadBadge(count: _unreadMessages),
                             const SizedBox(width: 10),
@@ -949,6 +1014,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 24),
 
+                // Footer app name.
                 Center(
                   child: Text(
                     'Mova',

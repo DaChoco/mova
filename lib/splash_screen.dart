@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'mova_logo_painter.dart';
 
+// Animated intro screen: a green glow fades in, the logo fades and scales in,
+// then the "Mova" text appears before moving on to the login screen.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -12,10 +14,14 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
+  // Single controller that drives every animation on this screen.
   late final AnimationController _c;
 
+  // Total length of the animation timeline in milliseconds.
   static const int _totalMs = 2100;
 
+  // Creates an animation that only plays between [start] and [end]
+  // (in milliseconds) of the overall timeline.
   Animation<double> _iv(int start, int end, [Curve curve = Curves.easeOut]) {
     return CurvedAnimation(
       parent: _c,
@@ -23,10 +29,15 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
+  // Glow fades in first, then partly settles back down.
   late final Animation<double> _glowIn = _iv(0, 900);
   late final Animation<double> _glowSettle = _iv(1000, 1500, Curves.easeInOut);
+
+  // Logo fades in and grows slightly.
   late final Animation<double> _logoFade = _iv(300, 1050);
   late final Animation<double> _logoScale = _iv(300, 1600, Curves.easeOutCubic);
+
+  // "Mova" text fades in last.
   late final Animation<double> _text = _iv(1650, 2050);
 
   @override
@@ -38,9 +49,12 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: _totalMs),
     );
 
+    // Start the animation and go to the login screen once it finishes.
     _c.forward().whenComplete(_navigateToLogin);
   }
 
+  // Pauses briefly after the animation, then replaces this screen
+  // with the login screen (so Back won't return to the splash).
   Future<void> _navigateToLogin() async {
     await Future.delayed(const Duration(milliseconds: 500));
 
@@ -53,6 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    // Release the animation controller.
     _c.dispose();
     super.dispose();
   }
@@ -64,11 +79,14 @@ class _SplashScreenState extends State<SplashScreen>
       body: SizedBox.expand(
         child: AnimatedBuilder(
           animation: _c,
+          // The glow itself never changes, only its opacity does, so it is
+          // built once here and reused on every animation frame.
           child: RepaintBoundary(
             child: Container(
               width: 420,
               height: 420,
               decoration: const BoxDecoration(
+                // Radial gradient fading from solid green to transparent.
                 gradient: RadialGradient(
                   center: Alignment.center,
                   radius: 0.7,
@@ -83,6 +101,7 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
           builder: (context, glowChild) {
+            // Glow brightens while fading in, then dims slightly as it settles.
             final glowOpacity =
                 (0.30 * _glowIn.value - 0.12 * _glowSettle.value).clamp(
                   0.0,
@@ -92,14 +111,17 @@ class _SplashScreenState extends State<SplashScreen>
             return Stack(
               alignment: Alignment.center,
               children: [
+                // Background glow.
                 Opacity(opacity: glowOpacity, child: glowChild),
 
+                // Logo and text, centred on top of the glow.
                 RepaintBoundary(
                   child: SizedBox(
                     width: 192,
                     height: 223,
                     child: Column(
                       children: [
+                        // Logo: fades in and scales from 80% to 100%.
                         Opacity(
                           opacity: _logoFade.value,
                           child: Transform.scale(
@@ -107,6 +129,8 @@ class _SplashScreenState extends State<SplashScreen>
                             child: SizedBox(
                               width: 192,
                               height: 148,
+                              // OverflowBox lets the logo's blur/glow extend
+                              // slightly beyond the box without being clipped.
                               child: OverflowBox(
                                 maxWidth: 200,
                                 maxHeight: 161,
@@ -121,6 +145,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                         const SizedBox(height: 22),
 
+                        // App name: fades in while sliding up 4 pixels.
                         Opacity(
                           opacity: _text.value,
                           child: Transform.translate(

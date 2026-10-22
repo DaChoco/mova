@@ -17,6 +17,7 @@ final ValueNotifier<Uint8List?> profileImageNotifier =
 // Downloads the profile picture from [url] and stores it in
 // [profileImageNotifier].
 Future<void> loadProfileImage(String? url) async {
+  // No URL means no picture: clear the shared image.
   if (url == null || url.isEmpty) {
     profileImageNotifier.value = null;
     return;
@@ -25,6 +26,7 @@ Future<void> loadProfileImage(String? url) async {
   try {
     final response = await http.get(Uri.parse(url));
 
+    // Only update the image when the download succeeded.
     if (response.statusCode == 200) {
       profileImageNotifier.value = response.bodyBytes;
     }
@@ -33,6 +35,8 @@ Future<void> loadProfileImage(String? url) async {
   }
 }
 
+// Profile page: shows the user's details, and lets them change their
+// profile picture, password and account role (driver or passenger).
 class ProfileScreen extends StatefulWidget {
   final User user;
 
@@ -43,33 +47,42 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // Mova brand colour.
   static const Color _movaGreen = Color(0xFF0F6E56);
 
+  // Local copy of the user so it can be updated on this screen.
   late User _user;
 
   final AuthService _authService = AuthService(
     baseUrl: AppConfig.backendBaseUrl,
   );
 
+  // Loading flags used to disable buttons and show spinners.
   bool _isUploadingImage = false;
   bool _isSavingRole = false;
   bool _isChangingPassword = false;
 
+  // Controllers for the password fields.
   final TextEditingController _currentPasswordController =
       TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+
+  // Controllers for the driver's car details.
   final TextEditingController _carRegistrationController =
       TextEditingController();
   final TextEditingController _carModelController = TextEditingController();
 
+  // Role currently selected in the dropdown ('Driver' or 'Passenger').
   String _selectedRole = 'Passenger';
 
+  // Whether each password field's text is hidden.
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
 
+  // Validation error shown under the confirm password field.
   String? _passwordError;
 
   @override
@@ -77,8 +90,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
 
     _user = widget.user;
+
+    // Start the dropdown on the user's current role.
     _selectedRole = _user.isDriver ? 'Driver' : 'Passenger';
 
+    // Load the profile picture if one hasn't been loaded already.
     if (profileImageNotifier.value == null) {
       final profileURL =
           '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
@@ -88,6 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    // Release all text controllers.
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -96,6 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  // Shows a floating snack bar with the given message.
   void _showMessage(String message) {
     if (!mounted) return;
 
@@ -108,17 +126,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Saves the chosen account role. Choosing Driver requires both a car
+  // registration and a car model.
   Future<void> _saveAccountRole() async {
+    // Ignore taps while a save is already running.
     if (_isSavingRole) return;
 
     final carRegistration = _carRegistrationController.text.trim();
     final carModel = _carModelController.text.trim();
 
+    // The user only counts as a driver if Driver is selected AND both car
+    // fields are filled in.
     final bool isDriver =
         _selectedRole == 'Driver' &&
         carRegistration.isNotEmpty &&
         carModel.isNotEmpty;
 
+    // Driver was chosen but the car details are missing.
     if (_selectedRole == 'Driver' && !isDriver) {
       _showMessage('Please enter your car registration and model.');
       return;
@@ -134,6 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
+      // Rebuild the local user with the new driver status.
       setState(() {
         _user = User(
           userId: _user.userId,
@@ -159,26 +184,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Lets the user choose a photo from the gallery, uploads it and updates
+  // the shared profile image.
   Future<void> _pickProfileImage() async {
+    // Ignore taps while an upload is already running.
     if (_isUploadingImage) return;
 
     try {
       final picker = ImagePicker();
 
+      // Open the gallery (compressed to 85% quality).
       final image = await picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
       );
 
+      // User cancelled the picker.
       if (image == null || !mounted) return;
 
       setState(() => _isUploadingImage = true);
 
+      // Upload to the backend, and read the bytes to show it immediately.
       final imageUrl = await _authService.uploadProfilePicture(image);
       final imageBytes = await image.readAsBytes();
 
+      // Update every avatar in the app that listens to this notifier.
       profileImageNotifier.value = imageBytes;
 
+      // Keep the local user in sync with the new picture.
       _user = User(
         userId: _user.userId,
         studentNumber: _user.studentNumber,
@@ -201,6 +234,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Checks the password fields. Returns true when valid; otherwise stores
+  // an error message to display and returns false.
   bool _validatePasswords() {
     final currentPassword = _currentPasswordController.text;
     final newPassword = _newPasswordController.text;
@@ -222,7 +257,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return error == null;
   }
 
+  // Changes the password, then logs the user out so they sign in again.
   Future<void> _changePassword() async {
+    // Ignore taps while running, and stop if validation fails.
     if (_isChangingPassword || !_validatePasswords()) return;
 
     setState(() => _isChangingPassword = true);
@@ -239,12 +276,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       _showMessage('Password changed successfully');
 
+      // Sign out and clear the cached profile picture.
       await _authService.logout();
 
       profileImageNotifier.value = null;
 
       if (!mounted) return;
 
+      // Go back to the login screen, removing all earlier screens.
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -258,6 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Shared styling for text fields on this screen.
   InputDecoration _inputDecoration({
     required String label,
     required IconData icon,
@@ -272,16 +312,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       filled: true,
       fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      // No outline by default...
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
       ),
+      // ...a faint outline when enabled...
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide(
           color: scheme.outlineVariant.withValues(alpha: 0.55),
         ),
       ),
+      // ...and a green outline when focused.
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(color: _movaGreen, width: 1.5),
@@ -289,12 +332,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // A read-only, slightly dimmed field used to display a piece of the
+  // user's information.
   Widget _buildInfoField(String label, String value, IconData icon) {
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
+        // The key changes with the value so the field refreshes when the
+        // underlying data changes.
         key: ValueKey('$label:$value'),
         initialValue: value,
         readOnly: true,
@@ -306,6 +353,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Builds a rounded card with an icon, title and subtitle at the top and
+  // the given [children] underneath. Used to group related settings.
   Widget _buildSection({
     required String title,
     required String subtitle,
@@ -335,6 +384,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Card header: icon badge + title and subtitle.
           Row(
             children: [
               Container(
@@ -372,12 +422,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           const SizedBox(height: 22),
+          // The section's content.
           ...children,
         ],
       ),
     );
   }
 
+  // A password text field with a show/hide eye button and optional error.
   Widget _buildPasswordField({
     required String label,
     required TextEditingController controller,
@@ -388,6 +440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return TextField(
       controller: controller,
       obscureText: obscureText,
+      // Clear the old validation error as soon as the user edits a field.
       onChanged: (_) {
         if (_passwordError != null) {
           setState(() => _passwordError = null);
@@ -409,6 +462,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Full-width green button. Shows a spinner and "Please wait..." while
+  // [isLoading] is true. Passing a null [onPressed] disables it.
   Widget _buildPrimaryButton({
     required String label,
     required VoidCallback? onPressed,
@@ -450,6 +505,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
+    // Whether the Driver role is currently selected in the dropdown.
     final isDriver = _selectedRole == 'Driver';
 
     return Scaffold(
@@ -486,6 +543,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
+                  // Avatar with a camera button in the bottom-right corner.
+                  // Rebuilds whenever the shared profile image changes.
                   ValueListenableBuilder<Uint8List?>(
                     valueListenable: profileImageNotifier,
                     builder: (context, image, child) {
@@ -506,6 +565,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               backgroundColor: Colors.white.withValues(
                                 alpha: 0.18,
                               ),
+                              // Show the photo, or a person icon if none.
                               backgroundImage: image != null
                                   ? MemoryImage(image)
                                   : null,
@@ -518,6 +578,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   : null,
                             ),
                           ),
+                          // Camera button: opens the image picker, or shows
+                          // a spinner while uploading.
                           Material(
                             color: Colors.white,
                             shape: const CircleBorder(),
@@ -568,6 +630,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  // Pill showing whether this is a driver or passenger account.
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -629,12 +692,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _user.studentNumber,
                   Icons.school_outlined,
                 ),
+                // The student email is built from the student number.
                 _buildInfoField(
                   'Student Email',
                   '${_user.studentNumber}@vossie.net',
                   Icons.email_outlined,
                 ),
                 const SizedBox(height: 2),
+                // Note explaining that these fields can't be edited.
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -682,6 +747,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 15),
+                // The validation error is displayed on this last field.
                 _buildPasswordField(
                   label: 'Confirm New Password',
                   controller: _confirmPasswordController,
@@ -692,6 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   errorText: _passwordError,
                 ),
                 const SizedBox(height: 15),
+                // Info box with the password rules.
                 Container(
                   padding: const EdgeInsets.all(13),
                   decoration: BoxDecoration(
@@ -733,6 +800,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: 'Choose how you use Mova',
               icon: Icons.swap_horiz_rounded,
               children: [
+                // Dropdown to choose between Driver and Passenger.
                 DropdownButtonFormField<String>(
                   initialValue: _selectedRole,
                   decoration: _inputDecoration(
@@ -753,6 +821,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     setState(() => _selectedRole = value);
                   },
                 ),
+                // Car details are only shown when Driver is selected.
                 if (isDriver) ...[
                   const SizedBox(height: 24),
                   Row(
@@ -804,6 +873,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
 
+            // Footer tagline.
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(top: 2, bottom: 8),

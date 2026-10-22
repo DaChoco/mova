@@ -7,6 +7,7 @@ import 'models/auth.dart';
 import 'services/auth_service.dart';
 import 'home_screen.dart';
 
+// Login page where students sign in with their student number and password.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,28 +16,37 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // Key used to validate the form fields.
   final _formKey = GlobalKey<FormState>();
 
+  // Controllers that hold the text typed into each field.
   final studentNumberController = TextEditingController();
   final passwordController = TextEditingController();
 
+  // Whether the password text is hidden.
   bool _hidePassword = true;
+
+  // True while the login request is running (disables the button).
   bool _isLoggingIn = false;
 
   final AuthService _authService = AuthService(
     baseUrl: AppConfig.backendBaseUrl,
   );
 
+  // Mova brand colour.
   static const Color _movaGreen = Color(0xFF0F6E56);
 
   @override
   void dispose() {
+    // Release the text controllers.
     studentNumberController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
+  // Validates the form, logs the user in, then opens the home screen.
   Future<void> _login() async {
+    // Stop if any field fails validation.
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -59,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
+      // Replace the login page so Back won't return to it.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => HomeScreen(user: user)),
@@ -66,6 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      // Show the error without the "Exception: " prefix.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -73,6 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } finally {
+      // Re-enable the login button.
       if (mounted) {
         setState(() {
           _isLoggingIn = false;
@@ -89,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final borderRadius = BorderRadius.circular(16);
 
+    // Shared text field styling; each field customises it with copyWith.
     final inputDecoration = InputDecoration(
       filled: true,
       fillColor: colors.surfaceContainerHighest.withAlpha(isDark ? 150 : 100),
@@ -102,18 +116,22 @@ class _LoginScreenState extends State<LoginScreen> {
         color: colors.onSurfaceVariant.withAlpha(180),
       ),
       prefixIconColor: colors.primary,
+      // No outline by default...
       border: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: BorderSide.none,
       ),
+      // ...a faint outline when enabled...
       enabledBorder: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: BorderSide(color: colors.outlineVariant.withAlpha(130)),
       ),
+      // ...a green outline when focused...
       focusedBorder: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: const BorderSide(color: _movaGreen, width: 1.8),
       ),
+      // ...and red outlines when the field has a validation error.
       errorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: BorderSide(color: colors.error),
@@ -129,6 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
+        // Soft green tint fading out towards the bottom of the screen.
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -142,6 +161,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         child: SafeArea(
+          // LayoutBuilder gives the available height so the content can be
+          // vertically centred but still scroll on small screens.
           child: LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
@@ -150,10 +171,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   vertical: 28,
                 ),
                 child: ConstrainedBox(
+                  // Minimum height = screen height minus the vertical padding.
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight - 56,
                   ),
                   child: Center(
+                    // Limit the width on large screens (tablets, web).
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 440),
                       child: Form(
@@ -274,6 +297,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         Icons.person_outline_rounded,
                                       ),
                                     ),
+                                    // Accepts "EDUV" followed by 7 digits, or
+                                    // any 9 letters/digits (case-insensitive).
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'Please enter your student number';
@@ -308,6 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       prefixIcon: const Icon(
                                         Icons.lock_outline_rounded,
                                       ),
+                                      // Eye icon toggles password visibility.
                                       suffixIcon: IconButton(
                                         tooltip: _hidePassword
                                             ? 'Show password'
@@ -324,6 +350,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         },
                                       ),
                                     ),
+                                    // Only checks that something was entered.
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'Please enter your password';
@@ -339,6 +366,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   SizedBox(
                                     height: 56,
                                     child: FilledButton(
+                                      // Disabled while a login is in progress.
                                       onPressed: _isLoggingIn ? null : _login,
                                       style: FilledButton.styleFrom(
                                         backgroundColor: _movaGreen,
@@ -351,6 +379,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         ),
                                       ),
+                                      // Spinner while logging in, otherwise
+                                      // the "Login" label with an arrow.
                                       child: _isLoggingIn
                                           ? const SizedBox(
                                               width: 23,
@@ -398,6 +428,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             color: colors.onSurfaceVariant,
                                           ),
                                         ),
+                                        // Opens the Terms & Conditions page.
                                         TextButton(
                                           onPressed: () {
                                             Navigator.push(
@@ -451,6 +482,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ),
                                 ),
+                                // Disabled while logging in; otherwise opens
+                                // the registration page.
                                 TextButton(
                                   onPressed: _isLoggingIn
                                       ? null
@@ -483,6 +516,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             const SizedBox(height: 12),
 
+                            // Footer tagline.
                             Text(
                               'A simpler way to get where you need to go.',
                               textAlign: TextAlign.center,
