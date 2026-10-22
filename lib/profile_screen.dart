@@ -17,21 +17,29 @@ final ValueNotifier<Uint8List?> profileImageNotifier =
 // Downloads the profile picture from [url] and stores it in
 // [profileImageNotifier].
 Future<void> loadProfileImage(String? url) async {
-  // No URL means no picture: clear the shared image.
-  if (url == null || url.isEmpty) {
-    profileImageNotifier.value = null;
+  // Keep the cached image if the refreshed user has no image path.
+  // Logout already clears the notifier explicitly.
+  if (url == null || url.trim().isEmpty) {
     return;
   }
 
-  try {
-    final response = await http.get(Uri.parse(url));
+  // Support both complete URLs and storage paths.
+  final imagePath = url.trim();
+  final Uri? parsedUrl = Uri.tryParse(imagePath);
 
-    // Only update the image when the download succeeded.
-    if (response.statusCode == 200) {
+  final String imageUrl = parsedUrl != null && parsedUrl.hasScheme
+      ? imagePath
+      : '${AppConfig.supabaseBucketBaseUrl.replaceFirst(RegExp(r'/$'), '')}/'
+            '${imagePath.replaceFirst(RegExp(r'^/'), '')}';
+
+  try {
+    final response = await http.get(Uri.parse(imageUrl));
+
+    if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
       profileImageNotifier.value = response.bodyBytes;
     }
   } catch (_) {
-    // Keep the existing image if loading fails.
+    // Preserve the existing image if the download fails.
   }
 }
 

@@ -62,9 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // If the user has a profile picture, download it for the avatars;
     // otherwise fetch the latest user details from the backend.
     if (_user.profileIcon != null && _user.profileIcon!.isNotEmpty) {
-      final profileURL =
-          '${AppConfig.supabaseBucketBaseUrl}/${_user.profileIcon}';
-      loadProfileImage(profileURL);
+      loadProfileImage(_user.profileIcon);
     } else {
       _refreshUser();
     }
@@ -271,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _user = updatedUser;
       });
 
-      loadProfileImage(updatedUser.profileIcon);
+      await loadProfileImage(updatedUser.profileIcon);
     } catch (e) {
       if (!mounted) return;
 
