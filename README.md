@@ -8,6 +8,10 @@ Drivers can create rides by specifying their pickup location, scheduled departur
 
 The application is being developed using Flutter for the frontend and ASP.NET Core Web API for the backend.
 
+## App Video Demo
+
+[Watch the Mova app demo](https://1drv.ms/v/c/5dc82f77decc5472/IQC71hCxN52pQLUnK3QYiXMkAb4M5roZB3o8DYuLjOyEhrw?e=OROQlv)
+
 ## Features
 
 - **User Authentication:** Register and log in using student account credentials.
