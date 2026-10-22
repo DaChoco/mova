@@ -23,7 +23,7 @@ namespace Mova.Api.Helpers
             _configuration = configuration;
             _httpClient = httpClient;
         }
-
+        // Deletes all files in the specified folder of a Supabase storage bucket, optionally excluding a specific file.
         private async Task DeleteFolderContentsAsync(
     string supabaseUrl,
     string serviceKey,
@@ -33,8 +33,10 @@ namespace Mova.Api.Helpers
         {
             while (true)
             {
+                // List files in the folder
                 var listUrl = $"{supabaseUrl}/storage/v1/object/list/{bucketName}";
 
+                // Create a POST request to list files in the folder
                 using var listRequest = new HttpRequestMessage(HttpMethod.Post, listUrl);
                 listRequest.Headers.Add("apikey", serviceKey);
                 listRequest.Headers.Add("Authorization", $"Bearer {serviceKey}");
@@ -51,6 +53,7 @@ namespace Mova.Api.Helpers
 
                 using var doc = JsonDocument.Parse(listBody);
 
+                // Extract file paths, excluding the specified file name
                 var paths = doc.RootElement.EnumerateArray()
                     .Select(e => e.GetProperty("name").GetString())
                     .Where(n => !string.IsNullOrEmpty(n) && n != excludeFileName)
@@ -68,7 +71,7 @@ namespace Mova.Api.Helpers
                     JsonSerializer.Serialize(new { prefixes = paths }),
                     Encoding.UTF8,
                     "application/json");
-
+                // Send the delete request
                 using var deleteResponse = await _httpClient.SendAsync(deleteRequest);
                 var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
 
@@ -80,6 +83,7 @@ namespace Mova.Api.Helpers
             }
         }
 
+        // Uploads a profile picture to Supabase storage and returns the public URL of the uploaded image.
         public async Task<string> UploadProfilePictureAsync(
             string bucketName,
             string userId,
@@ -90,14 +94,6 @@ namespace Mova.Api.Helpers
             var supabaseUrl = _configuration["SUPABASE_URL"]?.Trim().TrimEnd('/', ';'); ;
             var serviceKey = _configuration["SUPABASE_SERVICE_KEY"]?.Trim().TrimEnd('/', ';'); ;
 
-            Console.WriteLine($"Supabase URL: '{supabaseUrl}'");
-
-            Console.WriteLine(
-                $"Service key prefix: " +
-                $"{serviceKey?.Substring(0, Math.Min(10, serviceKey.Length))}");
-
-            Console.WriteLine(
-                $"Service key length: {serviceKey?.Length}");
 
             if (string.IsNullOrEmpty(supabaseUrl))
                 throw new InvalidOperationException("Supabase URL is not configured.");
@@ -106,7 +102,7 @@ namespace Mova.Api.Helpers
                 throw new InvalidOperationException("Supabase service key is not configured.");
 
             var filePath = $"{userId}/{fileName}";
-
+            // Ensure the file stream is at the beginning
             var url =
                 $"{supabaseUrl}/storage/v1/object/{bucketName}/{filePath}";
 
@@ -119,7 +115,7 @@ namespace Mova.Api.Helpers
             request.Content = new StreamContent(fileStream);
             request.Content.Headers.ContentType =
                 new MediaTypeHeaderValue(contentType);
-
+            // Send the request to Supabase
             using var response = await _httpClient.SendAsync(request);
 
             var responseBody =
@@ -127,6 +123,7 @@ namespace Mova.Api.Helpers
 
             if (!response.IsSuccessStatusCode)
             {
+                // If the upload fails, throw an exception with the status code and response body for debugging.
                 throw new Exception(
                     $"Supabase upload failed: " +
                     $"{(int)response.StatusCode} " +

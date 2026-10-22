@@ -164,8 +164,9 @@ public class UserController : ControllerBase
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
 
+        
         await _db.SaveChangesAsync();
-
+        // Revoke all active refresh tokens for the user after changing the password
         var activeTokens = await _db.RefreshTokens
             .Where(rt => rt.UserId == userId && rt.RevokedAt == null)
             .ToListAsync();
@@ -184,6 +185,7 @@ public class UserController : ControllerBase
         });
     }
 
+    // Endpoint for uploading a user's profile picture. Accepts a multipart/form-data request containing the image file.
     [HttpPost("profile/upload")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadProfilePicture(IFormFile file)
@@ -263,7 +265,7 @@ public class UserController : ControllerBase
         try
         {
             await using var stream = file.OpenReadStream();
-
+            // Upload the profile picture to Supabase storage
             var profilePictureUrl =
                 await _storage.UploadProfilePictureAsync(
                     bucketName: "user-icons",
@@ -274,6 +276,7 @@ public class UserController : ControllerBase
 
             user.ProfileIcon = $"{userId}/{fileName}";
 
+            // Save the updated profile icon path to the database
             await _db.SaveChangesAsync();
 
             return Ok(new

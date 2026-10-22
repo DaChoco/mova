@@ -9,7 +9,7 @@ using Microsoft.Extensions.FileProviders;
 using DotNetEnv;
 using Mova.Api.Services;
 using Mova.Api.Hubs;
-
+// Load environment variables from the .env file located in the current directory.
 Env.Load(
     Path.Combine(Directory.GetCurrentDirectory(), ".env"),
     new DotNetEnv.LoadOptions(
@@ -28,7 +28,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException(
         "ConnectionStrings:Default is missing.");
 }
-
+// Validate the PostgreSQL connection string using NpgsqlConnectionStringBuilder.
 var db = new NpgsqlConnectionStringBuilder(connectionString);
 
 
@@ -115,7 +115,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 
 builder.Services.AddAuthorization();
-
+// Configure MongoDB settings from environment variables for dependency injection.
 builder.Services.Configure<MongoSettings>(options =>
 {
     options.ConnectionString =
@@ -129,10 +129,11 @@ builder.Services.Configure<MongoSettings>(options =>
             "MONGO_MESSAGE_DATABASE_NAME is not configured.");
 });
 
+// Register MongoDbContext as a singleton service for dependency injection.
 builder.Services.AddSingleton<MongoDbContext>();
 
 builder.Services.AddEndpointsApiExplorer();
-
+// Add Swagger/OpenAPI support for API documentation and testing.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FlutterWeb", policy =>

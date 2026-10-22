@@ -25,7 +25,7 @@ public class AuthController : ControllerBase
         _db = db;
         _config = config;
     }
-/// Registers a new user and returns a JWT and refresh token upon successful registration.
+    /// Registers a new user and returns a JWT and refresh token upon successful registration.
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest req)
     {
@@ -53,7 +53,7 @@ public class AuthController : ControllerBase
             user = ToDto(user)
         });
     }
-/// Logs in an existing user and returns a JWT and refresh token upon successful authentication.
+    /// Logs in an existing user and returns a JWT and refresh token upon successful authentication.
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest req)
     {
@@ -75,7 +75,7 @@ public class AuthController : ControllerBase
 
 
     /// Refreshes the access token using a valid refresh token.
-    
+
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(RefreshRequest req)
     {
@@ -101,7 +101,7 @@ public class AuthController : ControllerBase
         });
     }
 
-/// Logs out the user by revoking the provided refresh token.
+    /// Logs out the user by revoking the provided refresh token.
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest req)
     {
@@ -116,7 +116,7 @@ public class AuthController : ControllerBase
         return Ok(new { success = true });
     }
 
-/// Generates refresh token for the user, stores its hash in the database, and returns the plain token to be sent to the client.
+    /// Generates refresh token for the user, stores its hash in the database, and returns the plain token to be sent to the client.
     private async Task<(RefreshToken entity, string plainToken)> IssueRefreshToken(int userId)
     {
         var days = double.Parse(_config["Jwt:RefreshTokenExpiryDays"]!);
@@ -168,14 +168,14 @@ public class AuthController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-// Converts a User entity to a DTO for API responses.
-   private static object ToDto(User u) => new
-{
-    userId = u.UserId,
-    studentNumber = u.StudentNumber,
-    firstName = u.FirstName,
-    surname = u.Surname,
-    carID = u.CarId,
-    isDriver = u.IsDriver
-};
+    // Converts a User entity to a DTO for API responses.
+    private static object ToDto(User u) => new
+    {
+        userId = u.UserId,
+        studentNumber = u.StudentNumber,
+        firstName = u.FirstName,
+        surname = u.Surname,
+        carID = u.CarId,
+        isDriver = u.IsDriver
+    };
 }

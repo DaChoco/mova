@@ -22,50 +22,50 @@ public class RidesController : ControllerBase
     // Driver creates a ride
     [HttpPost]
     public async Task<IActionResult> Create(CreateRideRequest req)
-{
-    var driverId = CurrentUserId();
-    var driver = await _db.Users.FindAsync(driverId);
-
-    if (driver is null)
-        return NotFound(new { success = false });
-
-    if (!driver.IsDriver)
-        return Forbid();
-
-    if (req.AvailableSeats < 1)
-        return BadRequest(new { success = false, message = "Available seats must be at least 1." });
-
-    if (req.ScheduledFor <= DateTime.UtcNow)
-        return BadRequest(new { success = false, message = "Scheduled time must be in the future." });
-
-    var distanceKm = HaversineDistanceKm(
-        req.PickupLatitude, req.PickupLongitude,
-        req.DestinationLatitude, req.DestinationLongitude);
-
-    var estimatedFare = Math.Round(20 + distanceKm * 8, 2);
-
-    var ride = new Ride
     {
-        DriverId = driverId,
-        PickupLatitude = req.PickupLatitude,
-        PickupLongitude = req.PickupLongitude,
-        PickupAddress = req.PickupAddress,
-        DestinationLatitude = req.DestinationLatitude,
-        DestinationLongitude = req.DestinationLongitude,
-        DestinationAddress = req.DestinationAddress,
-        RequestedAt = DateTime.UtcNow,
-        Status = "searching_driver",
-        AvailableSeats = req.AvailableSeats,
-        ScheduledFor = req.ScheduledFor,
-        EstimatedFare = estimatedFare
-       
-    };
+        var driverId = CurrentUserId();
+        var driver = await _db.Users.FindAsync(driverId);
 
-    _db.Rides.Add(ride);
-    await _db.SaveChangesAsync();
+        if (driver is null)
+            return NotFound(new { success = false });
 
-    return Ok(new { success = true, ride = ToDto(ride) });
-}
+        if (!driver.IsDriver)
+            return Forbid();
+
+        if (req.AvailableSeats < 1)
+            return BadRequest(new { success = false, message = "Available seats must be at least 1." });
+
+        if (req.ScheduledFor <= DateTime.UtcNow)
+            return BadRequest(new { success = false, message = "Scheduled time must be in the future." });
+
+        var distanceKm = HaversineDistanceKm(
+            req.PickupLatitude, req.PickupLongitude,
+            req.DestinationLatitude, req.DestinationLongitude);
+
+        var estimatedFare = Math.Round(20 + distanceKm * 8, 2);
+
+        var ride = new Ride
+        {
+            DriverId = driverId,
+            PickupLatitude = req.PickupLatitude,
+            PickupLongitude = req.PickupLongitude,
+            PickupAddress = req.PickupAddress,
+            DestinationLatitude = req.DestinationLatitude,
+            DestinationLongitude = req.DestinationLongitude,
+            DestinationAddress = req.DestinationAddress,
+            RequestedAt = DateTime.UtcNow,
+            Status = "searching_driver",
+            AvailableSeats = req.AvailableSeats,
+            ScheduledFor = req.ScheduledFor,
+            EstimatedFare = estimatedFare
+
+        };
+
+        _db.Rides.Add(ride);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { success = true, ride = ToDto(ride) });
+    }
     [HttpGet("{rideId}")]
     public async Task<IActionResult> GetById(int rideId)
     {
@@ -448,35 +448,35 @@ public class RidesController : ControllerBase
     private static double ToRad(double deg) => deg * Math.PI / 180;
 
     // CHANGED: optional counts and driverName added
-    
+
     // Ride response data, including driver information
     private static object ToDto(
         Ride r,
         int? acceptedCount = null,
         int? pendingCount = null) => new
-    {
-        rideId = r.RideId,
-        driverId = r.DriverId,
-        driverName = r.Driver == null
+        {
+            rideId = r.RideId,
+            driverId = r.DriverId,
+            driverName = r.Driver == null
             ? null
             : (r.Driver.FirstName + " " + r.Driver.Surname).Trim(),
 
-        status = r.Status,
+            status = r.Status,
 
-        pickupAddress = r.PickupAddress,
-        pickupLatitude = r.PickupLatitude,
-        pickupLongitude = r.PickupLongitude,
+            pickupAddress = r.PickupAddress,
+            pickupLatitude = r.PickupLatitude,
+            pickupLongitude = r.PickupLongitude,
 
-        destinationAddress = r.DestinationAddress,
-        destinationLatitude = r.DestinationLatitude,
-        destinationLongitude = r.DestinationLongitude,
+            destinationAddress = r.DestinationAddress,
+            destinationLatitude = r.DestinationLatitude,
+            destinationLongitude = r.DestinationLongitude,
 
-        availableSeats = r.AvailableSeats,
-        scheduledFor = r.ScheduledFor.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        estimatedFare = r.EstimatedFare,
-        requestedAt = r.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            availableSeats = r.AvailableSeats,
+            scheduledFor = r.ScheduledFor.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            estimatedFare = r.EstimatedFare,
+            requestedAt = r.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
 
-        acceptedCount,
-        pendingCount
-    };
+            acceptedCount,
+            pendingCount
+        };
 }

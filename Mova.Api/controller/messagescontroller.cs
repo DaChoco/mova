@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Mova.Api.Controllers;
 
+// Controller for handling messages related to rides. All endpoints require JWT authentication.
 [ApiController]
 [Route("api/rides/{rideId}/messages")]
 [Authorize]
@@ -27,7 +28,7 @@ public class MessagesController : ControllerBase
         _hubContext = hubContext;
     }
 
- 
+
 
     [HttpGet]
     public async Task<IActionResult> GetMessages(string rideId)
@@ -70,12 +71,12 @@ public class MessagesController : ControllerBase
             IsRead = false
         };
 
-        
+
 
         await _mongo.Messages.InsertOneAsync(doc);
 
 
-
+        // Notify all clients in the ride's group about the new message.
         var messagePayload = new
         {
             messageId = doc.Id,
@@ -85,6 +86,7 @@ public class MessagesController : ControllerBase
             sentAt = doc.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             isRead = doc.IsRead
         };
+        // The group name is "ride:{rideId}" to ensure that only clients connected to this ride's chat receive the message.
         await _hubContext.Clients.Group($"ride:{rideId}").SendAsync("ReceiveMessage", messagePayload);
 
         return Ok(new
@@ -125,7 +127,7 @@ public class MessagesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-    
+
                 message = "Message not found."
             });
         }
@@ -193,9 +195,9 @@ public class MessagesController : ControllerBase
         var result = await _mongo.Messages.UpdateManyAsync(filter, update);
 
         await _hubContext.Clients.Group($"ride:{rideId}").SendAsync("MessageRead", new
-    {
-        isRead = true
-    });
+        {
+            isRead = true
+        });
 
         return Ok(new { success = true, updated = result.ModifiedCount });
     }
@@ -205,140 +207,140 @@ public class MessagesController : ControllerBase
     [Route("/api/messages/mine")]
     [Route("/api/chats")]
 
-public async Task<IActionResult> GetMyChats()
-{
-    var currentUserIdValue =
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub");
-
-    if (!int.TryParse(currentUserIdValue, out var currentUserId))
+    public async Task<IActionResult> GetMyChats()
     {
-        return Unauthorized(new
+        var currentUserIdValue =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (!int.TryParse(currentUserIdValue, out var currentUserId))
         {
-            success = false,
-            message = "Invalid user ID."
-        });
-    }
-
-    // Find rides where the current user is the driver.
-    var driverRideIds = await _db.Rides
-        .Where(r => r.DriverId == currentUserId)
-        .Select(r => r.RideId)
-        .ToListAsync();
-
-    // Find rides where the current user is an accepted passenger.
-    var passengerRideIds = await _db.RideRequests
-        .Where(rr =>
-            rr.PassengerId == currentUserId &&
-            rr.Status == "accepted")
-        .Select(rr => rr.RideId)
-        .ToListAsync();
-
-    var rideIds = driverRideIds
-        .Union(passengerRideIds)
-        .Select(id => id.ToString())
-        .ToList();
-
-    if (rideIds.Count == 0)
-    {
-        return Ok(new { success = true, chats = new object[0] });
-    }
-
-    // Load messages for rides the current user participates in.
-    var filter = Builders<MessageDocument>.Filter.In(
-        m => m.RideId,
-        rideIds
-    );
-
-    var messages = await _mongo.Messages
-        .Find(filter)
-        .SortByDescending(m => m.SentAt)
-        .ToListAsync();
-
-    var chats = new List<object>();
-
-    foreach (var group in messages.GroupBy(m => m.RideId))
-    {
-        if (!int.TryParse(group.Key, out var rideId))
-            continue;
-
-        var ride = await _db.Rides
-            .Include(r => r.Driver)
-            .FirstOrDefaultAsync(r => r.RideId == rideId);
-
-        if (ride == null)
-            continue;
-
-        int otherUserId;
-
-        if (ride.DriverId == currentUserId)
-        {
-            // For a driver, prefer the most recent message
-            // sent by another participant.
-            var otherMessage = group
-                .FirstOrDefault(m => m.SenderId != currentUserId);
-
-            if (otherMessage != null)
+            return Unauthorized(new
             {
-                otherUserId = otherMessage.SenderId;
+                success = false,
+                message = "Invalid user ID."
+            });
+        }
+
+        // Find rides where the current user is the driver.
+        var driverRideIds = await _db.Rides
+            .Where(r => r.DriverId == currentUserId)
+            .Select(r => r.RideId)
+            .ToListAsync();
+
+        // Find rides where the current user is an accepted passenger.
+        var passengerRideIds = await _db.RideRequests
+            .Where(rr =>
+                rr.PassengerId == currentUserId &&
+                rr.Status == "accepted")
+            .Select(rr => rr.RideId)
+            .ToListAsync();
+
+        var rideIds = driverRideIds
+            .Union(passengerRideIds)
+            .Select(id => id.ToString())
+            .ToList();
+
+        if (rideIds.Count == 0)
+        {
+            return Ok(new { success = true, chats = new object[0] });
+        }
+
+        // Load messages for rides the current user participates in.
+        var filter = Builders<MessageDocument>.Filter.In(
+            m => m.RideId,
+            rideIds
+        );
+
+        var messages = await _mongo.Messages
+            .Find(filter)
+            .SortByDescending(m => m.SentAt)
+            .ToListAsync();
+
+        var chats = new List<object>();
+
+        foreach (var group in messages.GroupBy(m => m.RideId))
+        {
+            if (!int.TryParse(group.Key, out var rideId))
+                continue;
+
+            var ride = await _db.Rides
+                .Include(r => r.Driver)
+                .FirstOrDefaultAsync(r => r.RideId == rideId);
+
+            if (ride == null)
+                continue;
+
+            int otherUserId;
+
+            if (ride.DriverId == currentUserId)
+            {
+                // For a driver, prefer the most recent message
+                // sent by another participant.
+                var otherMessage = group
+                    .FirstOrDefault(m => m.SenderId != currentUserId);
+
+                if (otherMessage != null)
+                {
+                    otherUserId = otherMessage.SenderId;
+                }
+                else
+                {
+                    // If nobody else has sent a message yet,
+                    // use the first accepted passenger.
+                    var passenger = await _db.RideRequests
+                        .Where(rr =>
+                            rr.RideId == rideId &&
+                            rr.Status == "accepted")
+                        .OrderBy(rr => rr.RideRequestId)
+                        .FirstOrDefaultAsync();
+
+                    if (passenger == null)
+                        continue;
+
+                    otherUserId = passenger.PassengerId;
+                }
             }
             else
             {
-                // If nobody else has sent a message yet,
-                // use the first accepted passenger.
-                var passenger = await _db.RideRequests
-                    .Where(rr =>
-                        rr.RideId == rideId &&
-                        rr.Status == "accepted")
-                    .OrderBy(rr => rr.RideRequestId)
-                    .FirstOrDefaultAsync();
-
-                if (passenger == null)
-                    continue;
-
-                otherUserId = passenger.PassengerId;
+                // For a passenger, the other participant is the driver.
+                otherUserId = ride.DriverId;
             }
+
+            var otherUser = await _db.Users
+                .FindAsync(otherUserId);
+
+            if (otherUser == null)
+                continue;
+
+            var lastMessage = group
+                .OrderByDescending(m => m.SentAt)
+                .First();
+
+            chats.Add(new
+            {
+                rideId = group.Key,
+                otherUserId = otherUserId,
+                otherUserName =
+                    $"{otherUser.FirstName} {otherUser.Surname}".Trim(),
+                lastMessage = lastMessage.Message,
+                lastMessageAt =
+                    lastMessage.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                lastSenderType = lastMessage.SenderType,
+
+                // NEW: messages from other people in this ride that are still unread
+                unreadCount = group.Count(m => m.SenderId != currentUserId && !m.IsRead)
+            });
         }
-        else
+        // Sort chats by the time of the last message, descending.
+        return Ok(new
         {
-            // For a passenger, the other participant is the driver.
-            otherUserId = ride.DriverId;
-        }
-
-        var otherUser = await _db.Users
-            .FindAsync(otherUserId);
-
-        if (otherUser == null)
-            continue;
-
-        var lastMessage = group
-            .OrderByDescending(m => m.SentAt)
-            .First();
-
-        chats.Add(new
-        {
-            rideId = group.Key,
-            otherUserId = otherUserId,
-            otherUserName =
-                $"{otherUser.FirstName} {otherUser.Surname}".Trim(),
-            lastMessage = lastMessage.Message,
-            lastMessageAt =
-                lastMessage.SentAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            lastSenderType = lastMessage.SenderType,
-
-            // NEW: messages from other people in this ride that are still unread
-            unreadCount = group.Count(m => m.SenderId != currentUserId && !m.IsRead)
+            success = true,
+            chats = chats
+                .OrderByDescending(c =>
+                    ((dynamic)c).lastMessageAt)
+                .ToList()
         });
     }
-
-    return Ok(new
-    {
-        success = true,
-        chats = chats
-            .OrderByDescending(c =>
-                ((dynamic)c).lastMessageAt)
-            .ToList()
-    });
-}
 
 }

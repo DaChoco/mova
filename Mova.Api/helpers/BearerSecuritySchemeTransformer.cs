@@ -10,7 +10,7 @@ namespace Mova.Api.Helpers;
 internal sealed class BearerSecuritySchemeTransformer(
     IAuthenticationSchemeProvider authenticationSchemeProvider)
     : IOpenApiDocumentTransformer
-{
+{   // This transformer adds a Bearer security scheme to the OpenAPI document
     public async Task TransformAsync(
         OpenApiDocument document,
         OpenApiDocumentTransformerContext context,
